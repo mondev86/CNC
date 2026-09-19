@@ -1,5 +1,6 @@
 #!/bin/bash
 # PlasmaNGC Studio - Lanzador para Linux (Ubuntu / Debian / LinuxCNC / Mint)
+cd "$(dirname "$0")"
 
 echo "==================================================="
 echo "    PlasmaNGC Studio - Lanzador para Linux"

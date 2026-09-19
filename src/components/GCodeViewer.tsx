@@ -21,17 +21,21 @@ export const GCodeViewer: React.FC<GCodeViewerProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownloadNgc = () => {
+  const handleDownloadWithExt = (extension: '.ngc' | '.gcode' | '.txt') => {
+    const baseName = fileName.replace(/\.(ngc|gcode|txt)$/i, '');
+    const finalName = `${baseName}${extension}`;
     const blob = new Blob([toolpath.gcode], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = fileName.endsWith('.ngc') ? fileName : `${fileName}.ngc`;
+    link.download = finalName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
+
+  const handleDownloadNgc = () => handleDownloadWithExt('.ngc');
 
   const gcodeLines = toolpath.gcode.split('\n');
   const minutes = Math.floor(toolpath.estimatedTimeSeconds / 60);
@@ -98,27 +102,56 @@ export const GCodeViewer: React.FC<GCodeViewerProps> = ({
           <span className="text-xs text-stone-500">({gcodeLines.length} líneas)</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
           <button
             id="btn-copy-gcode"
             type="button"
             onClick={handleCopy}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-300 hover:bg-stone-50 text-xs font-medium text-stone-700 transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-stone-300 hover:bg-stone-50 text-xs font-medium text-stone-700 transition-colors"
+            title="Copiar código G completo al portapapeles"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copied ? 'Copiado' : 'Copiar'}</span>
           </button>
 
-          <button
-            id="btn-download-ngc"
-            type="button"
-            onClick={handleDownloadNgc}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 text-xs font-medium text-white transition-colors shadow-xs"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Descargar .NGC</span>
-          </button>
+          <div className="flex items-center rounded-lg border border-stone-300 overflow-hidden bg-stone-50 text-xs">
+            <button
+              id="btn-download-ngc"
+              type="button"
+              onClick={handleDownloadNgc}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white font-medium transition-colors cursor-pointer"
+              title="Descargar archivo .NGC para LinuxCNC (Axis, Gmoccapy)"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>.NGC (LinuxCNC)</span>
+            </button>
+            <button
+              id="btn-download-gcode"
+              type="button"
+              onClick={() => handleDownloadWithExt('.gcode')}
+              className="px-2.5 py-1.5 hover:bg-stone-200 text-stone-700 font-medium transition-colors border-l border-stone-300 cursor-pointer"
+              title="Descargar como .GCODE estándar universal"
+            >
+              .GCODE
+            </button>
+            <button
+              id="btn-download-txt"
+              type="button"
+              onClick={() => handleDownloadWithExt('.txt')}
+              className="px-2.5 py-1.5 hover:bg-stone-200 text-stone-700 font-medium transition-colors border-l border-stone-300 cursor-pointer"
+              title="Descargar como .TXT (texto para Bloc de Notas de Windows)"
+            >
+              .TXT
+            </button>
+          </div>
         </div>
+      </div>
+
+      {/* Info Tip about CNC vs EXE files */}
+      <div className="px-4 py-1.5 bg-stone-100/90 border-b border-stone-200 text-[11px] text-stone-600 flex items-center justify-between gap-2">
+        <span>
+          ℹ️ <strong>Formato CNC:</strong> Los archivos descargados son instrucciones de trayectoria en texto plano para LinuxCNC/Mach3. <em>No son programas ejecutables (.exe).</em>
+        </span>
       </div>
 
       {/* G-Code Monospace Scrollable Area */}

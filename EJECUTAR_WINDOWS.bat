@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 title PlasmaNGC Studio - LinuxCNC G-Code Generator
 color 0A
 
@@ -10,8 +11,10 @@ echo.
 where node >nul 2>nul
 if %errorlevel% neq 0 (
     echo [ERROR] No se encontro Node.js en este equipo.
-    echo Por favor descarga e instala Node.js (LTS recomendado) desde:
+    echo Por favor descarga e instala Node.js (version LTS recomendada) desde:
     echo https://nodejs.org/
+    echo.
+    echo (Una vez instalado Node.js, vuelve a hacer doble clic en este archivo).
     echo.
     pause
     exit /b 1
@@ -34,3 +37,4 @@ echo [3/3] Servidor activo. Presiona Ctrl+C para detener.
 echo.
 call npm run dev
 pause
+

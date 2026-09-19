@@ -140,6 +140,31 @@ export const DesktopInstallModal: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Permission Troubleshooter for Windows 11 & Linux */}
+                <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-xl space-y-2.5 text-[11px] text-amber-950">
+                  <div className="flex items-center gap-2 font-bold text-amber-900 text-xs">
+                    <span className="w-4 h-4 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center font-black text-[10px]">!</span>
+                    <span>¿Windows 11 o Linux te dice «No tiene permisos» o bloquea la ejecución?</span>
+                  </div>
+                  <div className="space-y-1.5 text-stone-700 leading-relaxed">
+                    <div>
+                      <strong className="text-stone-900">En Windows 11 (Pantalla azul SmartScreen "Windows protegió su PC"):</strong>
+                      <p className="mt-0.5">
+                        Windows 11 bloquea archivos descargados de internet. Para autorizarlo: haz clic en el enlace <u>"Más información"</u> y luego presiona el botón <strong>"Ejecutar de todas formas"</strong>. (O haz clic derecho en el archivo &gt; <em>Propiedades</em> &gt; abajo marca la casilla <strong>☑ Desbloquear</strong> &gt; Aceptar).
+                      </p>
+                    </div>
+                    <div className="pt-1 border-t border-amber-200/70">
+                      <strong className="text-stone-900">En Linux (Error "Permiso denegado" / "Permission denied"):</strong>
+                      <p className="mt-0.5">
+                        Linux bloquea la ejecución de scripts descargados hasta que le des permiso. Abre la terminal en la carpeta y escribe: <code className="bg-amber-100/80 px-1 py-0.5 rounded font-mono text-stone-900 font-semibold">chmod +x ejecutar_linux.sh</code> y luego <code className="bg-amber-100/80 px-1 py-0.5 rounded font-mono text-stone-900 font-semibold">./ejecutar_linux.sh</code>.
+                      </p>
+                    </div>
+                    <div className="pt-1 border-t border-amber-200/70 text-orange-900 font-medium">
+                      💡 <em>Consejo:</em> Si no quieres lidiar con scripts o terminales, usa la <strong>Pestaña 2 (App PWA 1-Clic)</strong> arriba; se instala directamente desde tu navegador sin ninguna advertencia de Windows.
+                    </div>
+                  </div>
+                </div>
+
                 {/* Offline & security notes */}
                 <div className="p-3 bg-stone-50 border border-stone-200 rounded-xl flex items-start gap-2.5 text-[11px] text-stone-600">
                   <HardDrive className="w-4 h-4 text-stone-500 shrink-0 mt-0.5" />
