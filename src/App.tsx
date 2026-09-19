@@ -10,6 +10,7 @@ import { parseSvgContent } from './utils/svgParser';
 import { generatePlasmaToolpath } from './utils/gcodeGenerator';
 import { SAMPLE_SVGS } from './utils/sampleSvgs';
 import { CanvasVisualizer } from './components/CanvasVisualizer';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { GCodeViewer } from './components/GCodeViewer';
 import { TextInputPanel } from './components/TextInputPanel';
 import { SvgConverterPanel } from './components/SvgConverterPanel';
@@ -253,11 +254,14 @@ export default function App() {
                   {toolpath.loops.length} contornos • {toolpath.totalCutLength.toFixed(1)} {plasmaConfig.unit} de corte
                 </span>
               </div>
-              <CanvasVisualizer
-                toolpath={toolpath}
-                unit={plasmaConfig.unit}
-                cutFeedRate={plasmaConfig.cutFeedRate}
-              />
+              <ErrorBoundary fallbackTitle="Error al ejecutar la simulación de corte">
+                <CanvasVisualizer
+                  toolpath={toolpath}
+                  unit={plasmaConfig.unit}
+                  cutFeedRate={plasmaConfig.cutFeedRate}
+                  onOpenSettings={() => setShowSettings(true)}
+                />
+              </ErrorBoundary>
             </div>
 
             {/* G-Code NGC Viewer & Download */}
