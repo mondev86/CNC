@@ -14,7 +14,14 @@ import {
   RotateCw,
   RotateCcw,
   Compass,
-  HelpCircle
+  HelpCircle,
+  Move,
+  Grid,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  RotateCcw as ResetIcon
 } from 'lucide-react';
 
 interface WorkpieceBarProps {
@@ -48,6 +55,7 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
 }) => {
   const [showCustomModal, setShowCustomModal] = useState<boolean>(false);
   const [showAlignmentHelp, setShowAlignmentHelp] = useState<boolean>(false);
+  const [showShiftMatrixPanel, setShowShiftMatrixPanel] = useState<boolean>(false);
 
   const bounds = toolpath?.bounds || { width: 0, height: 0, maxX: 0, maxY: 0, minX: 0, minY: 0 };
   const cutWidth = Math.round(bounds.width);
@@ -61,6 +69,11 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
   const exceedsPizarra = exceedsWidth || exceedsHeight;
 
   const currentAngle = workpiece.rotationAngle || 0;
+  const currentOffsetX = workpiece.offsetX || 0;
+  const currentOffsetY = workpiece.offsetY || 0;
+  const currentCols = workpiece.arrayCols || 1;
+  const currentRows = workpiece.arrayRows || 1;
+  const totalCopies = currentCols * currentRows;
 
   const currentPreset = STANDARD_SHEET_PRESETS.find(
     p => p.width === workpiece.width && p.height === workpiece.height
@@ -75,13 +88,28 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
   };
 
   const handleSetAngle = (deg: number) => {
-    // Normalize to -180 to 180
     let norm = deg % 360;
     if (norm > 180) norm -= 360;
     if (norm < -180) norm += 360;
     onWorkpieceChange({
       ...workpiece,
       rotationAngle: norm
+    });
+  };
+
+  const handleNudgeOffset = (deltaX: number, deltaY: number) => {
+    onWorkpieceChange({
+      ...workpiece,
+      offsetX: Math.round((currentOffsetX + deltaX) * 10) / 10,
+      offsetY: Math.round((currentOffsetY + deltaY) * 10) / 10
+    });
+  };
+
+  const handleResetOffset = () => {
+    onWorkpieceChange({
+      ...workpiece,
+      offsetX: 0,
+      offsetY: 0
     });
   };
 
@@ -122,6 +150,11 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
                 <span className="text-[11px] px-2 py-0.5 rounded-full font-mono font-medium bg-stone-100 text-stone-700 border border-stone-200">
                   {workpiece.width} × {workpiece.height} {unit}
                 </span>
+                {totalCopies > 1 && (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                    Matriz: {currentCols}×{currentRows} ({totalCopies} piezas)
+                  </span>
+                )}
                 {currentPreset && (
                   <span className="text-[10px] text-stone-500 hidden sm:inline">
                     ({currentPreset.description})
@@ -141,7 +174,7 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
                   key={preset.id}
                   type="button"
                   onClick={() => handleSelectPreset(preset)}
-                  className={`px-2 py-1 rounded-md text-[11px] font-mono font-medium transition-colors ${
+                  className={`px-2 py-1 rounded-md text-[11px] font-mono font-medium transition-colors cursor-pointer ${
                     isSelected
                       ? 'bg-orange-600 text-white shadow-xs'
                       : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
@@ -156,7 +189,9 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
             <button
               type="button"
               onClick={() => setShowCustomModal(!showCustomModal)}
-              className="px-2 py-1 rounded-md bg-stone-100 hover:bg-stone-200 text-stone-700 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
+              className={`px-2 py-1 rounded-md text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors ${
+                showCustomModal ? 'bg-orange-100 text-orange-800 font-semibold' : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
+              }`}
               title="Medidas personalizadas de chapa o más formatos"
             >
               <Sliders className="w-3 h-3" />
@@ -178,22 +213,21 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
           </div>
         </div>
 
-        {/* Row 2: Angle & Orientation Controls */}
+        {/* Row 2: Angle & Position Controls (Offset & Nesting Matrix) */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-0.5">
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Angle Controls */}
             <div className="flex items-center gap-1.5 text-xs font-semibold text-stone-800">
               <Compass className="w-4 h-4 text-orange-600 shrink-0" />
-              <span>Ángulo de Corte / Mesa:</span>
+              <span>Ángulo:</span>
             </div>
 
-            {/* Quick Angle presets */}
             <div className="flex items-center gap-1">
               {[
                 { label: '0°', deg: 0, title: 'Horizontal estándar' },
                 { label: '45°', deg: 45, title: 'Diagonal 45°' },
-                { label: '90°', deg: 90, title: 'Vertical 90° (Ideal para ahorrar ancho)' },
-                { label: '-45°', deg: -45, title: 'Diagonal invertida -45°' },
-                { label: '180°', deg: 180, title: 'Invertido 180°' },
+                { label: '90°', deg: 90, title: 'Vertical 90°' },
+                { label: '-45°', deg: -45, title: 'Diagonal invertida -45°' }
               ].map(item => (
                 <button
                   key={item.deg}
@@ -211,8 +245,7 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
               ))}
             </div>
 
-            {/* Fine step rotate buttons */}
-            <div className="flex items-center gap-1 border-l border-stone-200 pl-1.5 ml-0.5">
+            <div className="flex items-center gap-1 border-l border-stone-200 pl-1.5">
               <button
                 type="button"
                 onClick={() => handleSetAngle(currentAngle - 15)}
@@ -233,7 +266,6 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
               </button>
             </div>
 
-            {/* Angle Slider & Number Input */}
             <div className="flex items-center gap-1.5 bg-stone-100/90 px-2 py-1 rounded-lg border border-stone-200">
               <input
                 type="range"
@@ -242,7 +274,7 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
                 step="1"
                 value={currentAngle}
                 onChange={e => handleSetAngle(parseInt(e.target.value, 10) || 0)}
-                className="w-20 accent-orange-600 h-1.5 cursor-pointer"
+                className="w-16 accent-orange-600 h-1.5 cursor-pointer"
                 title="Ajuste fino de rotación (-180° a +180°)"
               />
               <div className="flex items-center">
@@ -252,10 +284,30 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
                   max="180"
                   value={currentAngle}
                   onChange={e => handleSetAngle(parseInt(e.target.value, 10) || 0)}
-                  className="w-12 text-center text-xs font-mono font-bold bg-white border border-stone-300 rounded px-1 py-0.5"
+                  className="w-11 text-center text-xs font-mono font-bold bg-white border border-stone-300 rounded px-1 py-0.5"
                 />
                 <span className="text-xs font-semibold text-stone-600 ml-0.5">°</span>
               </div>
+            </div>
+
+            {/* Position and Matrix toggle button */}
+            <div className="border-l border-stone-200 pl-2">
+              <button
+                type="button"
+                onClick={() => setShowShiftMatrixPanel(!showShiftMatrixPanel)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                  showShiftMatrixPanel || currentOffsetX !== 0 || currentOffsetY !== 0 || totalCopies > 1
+                    ? 'border-orange-500 bg-orange-50 text-orange-900 font-semibold'
+                    : 'border-stone-200 bg-stone-100 hover:bg-stone-200 text-stone-700'
+                }`}
+                title="Mover posición (X/Y) o multiplicar piezas para aprovechar material restante"
+              >
+                <Move className="w-3.5 h-3.5 text-orange-600" />
+                <span>Mover X/Y & Matriz</span>
+                {(currentOffsetX !== 0 || currentOffsetY !== 0 || totalCopies > 1) && (
+                  <span className="w-2 h-2 rounded-full bg-orange-600 inline-block"></span>
+                )}
+              </button>
             </div>
           </div>
 
@@ -267,9 +319,215 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
             title="Aprende cómo alinear en la mesa física con LinuxCNC o en el código"
           >
             <HelpCircle className="w-3.5 h-3.5 text-orange-600" />
-            <span>¿Cómo ubicarse en la mesa?</span>
+            <span>¿Cómo aprovechar material en la mesa?</span>
           </button>
         </div>
+
+        {/* Panel Desplazamiento X/Y y Matriz de Piezas (Aprovechamiento de Material) */}
+        {showShiftMatrixPanel && (
+          <div className="p-3.5 bg-orange-50/50 border border-orange-200 rounded-xl space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-orange-200/70 pb-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-orange-950">
+                <Move className="w-4 h-4 text-orange-600" />
+                <span>Aprovechamiento de Material: Desplazamiento X / Y y Matriz de Piezas</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-stone-600">
+                  Desplazamiento actual: <strong className="font-mono text-stone-900">X: {currentOffsetX} mm, Y: {currentOffsetY} mm</strong>
+                </span>
+                {(currentOffsetX !== 0 || currentOffsetY !== 0) && (
+                  <button
+                    type="button"
+                    onClick={handleResetOffset}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-stone-300 hover:bg-stone-100 rounded text-[11px] text-stone-700 cursor-pointer"
+                    title="Restablecer desplazamiento a cero"
+                  >
+                    <ResetIcon className="w-3 h-3" />
+                    <span>Cero (0,0)</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              {/* Columna 1: Mover en sentido vertical / horizontal */}
+              <div className="space-y-2.5 bg-white p-3 rounded-lg border border-orange-100">
+                <div className="font-semibold text-stone-900 text-xs flex items-center justify-between">
+                  <span>1. Desplazar pieza a sector libre (mm):</span>
+                  <span className="text-[10px] text-stone-500 font-normal">Flechas: ±20mm o ±50mm</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-stone-600 text-[11px] mb-1">
+                      Desplazamiento Horizontal X ({unit}):
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={currentOffsetX}
+                        onChange={e => onWorkpieceChange({ ...workpiece, offsetX: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 bg-stone-50 border border-stone-300 rounded font-mono text-xs font-bold text-stone-800"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleNudgeOffset(-20, 0)}
+                        className="p-1 rounded bg-stone-100 hover:bg-stone-200 text-stone-700"
+                        title="Mover 20 mm hacia la izquierda"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleNudgeOffset(20, 0)}
+                        className="p-1 rounded bg-stone-100 hover:bg-stone-200 text-stone-700"
+                        title="Mover 20 mm hacia la derecha"
+                      >
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-stone-600 text-[11px] mb-1">
+                      Desplazamiento Vertical Y ({unit}):
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={currentOffsetY}
+                        onChange={e => onWorkpieceChange({ ...workpiece, offsetY: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 bg-stone-50 border border-stone-300 rounded font-mono text-xs font-bold text-stone-800"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleNudgeOffset(0, -20)}
+                        className="p-1 rounded bg-stone-100 hover:bg-stone-200 text-stone-700"
+                        title="Mover 20 mm hacia abajo"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleNudgeOffset(0, 20)}
+                        className="p-1 rounded bg-stone-100 hover:bg-stone-200 text-stone-700"
+                        title="Mover 20 mm hacia arriba (continuar perforando arriba)"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                  <span className="text-[10px] text-stone-500 font-medium">Saltos rápidos:</span>
+                  {[
+                    { label: '+50 mm en Y (Arriba)', dx: 0, dy: 50 },
+                    { label: '+100 mm en Y (Arriba)', dx: 0, dy: 100 },
+                    { label: '+100 mm en X (Derecha)', dx: 100, dy: 0 },
+                    { label: '+200 mm en X (Derecha)', dx: 200, dy: 0 }
+                  ].map((btn, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleNudgeOffset(btn.dx, btn.dy)}
+                      className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-700 rounded text-[10px] font-mono cursor-pointer"
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Columna 2: Matriz Multi-pieza (Nesting simple fila/columna) */}
+              <div className="space-y-2.5 bg-white p-3 rounded-lg border border-orange-100">
+                <div className="font-semibold text-stone-900 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <Grid className="w-3.5 h-3.5 text-orange-600" />
+                    <span>2. Cortar varias piezas (Matriz en Chapa):</span>
+                  </div>
+                  {totalCopies > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => onWorkpieceChange({ ...workpiece, arrayCols: 1, arrayRows: 1 })}
+                      className="text-[10px] text-orange-700 hover:underline cursor-pointer"
+                    >
+                      Solo 1 pieza
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div>
+                    <label className="block text-stone-600 text-[10px] mb-1">Columnas (X):</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={currentCols}
+                      onChange={e => onWorkpieceChange({ ...workpiece, arrayCols: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                      className="w-full px-2 py-1 bg-stone-50 border border-stone-300 rounded font-mono text-xs font-bold text-center"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-stone-600 text-[10px] mb-1">Filas (Y):</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={currentRows}
+                      onChange={e => onWorkpieceChange({ ...workpiece, arrayRows: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                      className="w-full px-2 py-1 bg-stone-50 border border-stone-300 rounded font-mono text-xs font-bold text-center"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-stone-600 text-[10px] mb-1">Separación X ({unit}):</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={workpiece.arrayGapX !== undefined ? workpiece.arrayGapX : 10}
+                      onChange={e => onWorkpieceChange({ ...workpiece, arrayGapX: Math.max(0, parseFloat(e.target.value) || 0) })}
+                      className="w-full px-2 py-1 bg-stone-50 border border-stone-300 rounded font-mono text-xs text-center"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-stone-600 text-[10px] mb-1">Separación Y ({unit}):</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={workpiece.arrayGapY !== undefined ? workpiece.arrayGapY : 10}
+                      onChange={e => onWorkpieceChange({ ...workpiece, arrayGapY: Math.max(0, parseFloat(e.target.value) || 0) })}
+                      className="w-full px-2 py-1 bg-stone-50 border border-stone-300 rounded font-mono text-xs text-center"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                  <span className="text-[10px] text-stone-500 font-medium">Patrones rápidos:</span>
+                  {[
+                    { label: '2 en horizontal (2×1)', cols: 2, rows: 1 },
+                    { label: '3 en horizontal (3×1)', cols: 3, rows: 1 },
+                    { label: '2 en vertical (1×2)', cols: 1, rows: 2 },
+                    { label: 'Cuadrícula 2×2 (4 piezas)', cols: 2, rows: 2 }
+                  ].map((mat, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => onWorkpieceChange({ ...workpiece, arrayCols: mat.cols, arrayRows: mat.rows })}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-colors cursor-pointer ${
+                        currentCols === mat.cols && currentRows === mat.rows
+                          ? 'bg-orange-600 text-white font-bold border-orange-600'
+                          : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
+                      }`}
+                    >
+                      {mat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Custom Workpiece Dimensions & Positioning Dropdown */}
         {showCustomModal && (
@@ -324,7 +582,7 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-stone-600 text-[11px] mb-1">Posición en Chapa:</label>
+                <label className="block text-stone-600 text-[11px] mb-1">Posición Base en Chapa:</label>
                 <select
                   value={workpiece.positionMode}
                   onChange={e => onWorkpieceChange({ ...workpiece, positionMode: e.target.value as any })}
@@ -333,6 +591,7 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
                   <option value="origin_with_margin">Con margen (X:{workpiece.margin} Y:{workpiece.margin})</option>
                   <option value="center">Centrado en Chapa</option>
                   <option value="absolute_zero">Origen Cero Directo (0,0)</option>
+                  <option value="manual_offset">Offset Manual Puro (X e Y)</option>
                 </select>
               </div>
             </div>
@@ -377,12 +636,16 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
               ) : (
                 <span className="inline-flex items-center gap-1 font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded text-[11px]">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                  <span>Cabe dentro de la pizarra</span>
+                  <span>
+                    {totalCopies > 1
+                      ? `Todas las ${totalCopies} piezas caben dentro de la pizarra`
+                      : 'Cabe dentro de la pizarra'}
+                  </span>
                 </span>
               )}
 
               <span className="text-stone-600 text-[11px]">
-                Corte rotado a {currentAngle}°:{' '}
+                {totalCopies > 1 ? `Área de matriz (${totalCopies} piezas): ` : 'Corte: '}
                 <strong className="font-mono text-stone-800">{cutWidth} × {cutHeight} {unit}</strong>
                 {' '}(Área útil: <span className="font-mono text-stone-700">{usableWidth} × {usableHeight} {unit}</span>)
               </span>
@@ -390,22 +653,22 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
 
             {exceedsPizarra && (
               <p className="text-[11px] text-amber-900 leading-tight">
-                {exceedsWidth && `• El ancho (${cutWidth} mm) excede la chapa por ${cutWidth - usableWidth} mm.`}
-                {exceedsHeight && ` • La altura (${cutHeight} mm) excede la chapa por ${cutHeight - usableHeight} mm.`}
+                {exceedsWidth && `• El ancho total (${cutWidth} mm) excede la chapa por ${cutWidth - usableWidth} mm.`}
+                {exceedsHeight && ` • La altura total (${cutHeight} mm) excede la chapa por ${cutHeight - usableHeight} mm.`}
               </p>
             )}
           </div>
 
           {/* Action Buttons: Auto-Calculate Standard to Fit */}
           <div className="flex items-center gap-2 flex-wrap">
-            {activeTab === 'text' && autoFitTextResult && (
+            {activeTab === 'text' && autoFitTextResult && totalCopies === 1 && (
               <>
                 <button
                   type="button"
                   id="btn-autofit-standard"
                   onClick={handleAutoFitTextSingle}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium text-xs shadow-xs transition-colors cursor-pointer"
-                  title={`Calcula y ajusta la altura de letra a ${autoFitTextResult.recommendedFontSize} mm para que quepa a ${currentAngle}° en la chapa`}
+                  title={`Calcula y ajusta la altura de letra a ${autoFitTextResult.recommendedFontSize} mm para que quepa en la chapa`}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>
@@ -430,13 +693,13 @@ export const WorkpieceBar: React.FC<WorkpieceBarProps> = ({
               </>
             )}
 
-            {activeTab === 'svg' && autoFitSvgResult && onApplySvgAutoFit && (
+            {activeTab === 'svg' && autoFitSvgResult && onApplySvgAutoFit && totalCopies === 1 && (
               <button
                 type="button"
                 id="btn-autofit-svg"
                 onClick={onApplySvgAutoFit}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium text-xs shadow-xs transition-colors cursor-pointer"
-                title={`Escala el SVG a ${autoFitSvgResult.targetWidth} × ${autoFitSvgResult.targetHeight} mm para que quepa a ${currentAngle}°`}
+                title={`Escala el SVG a ${autoFitSvgResult.targetWidth} × ${autoFitSvgResult.targetHeight} mm para que quepa en la chapa`}
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>

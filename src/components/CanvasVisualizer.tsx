@@ -792,6 +792,14 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
               </span>
             </>
           )}
+          {workpiece?.arrayCols && workpiece?.arrayRows && (workpiece.arrayCols > 1 || workpiece.arrayRows > 1) && (
+            <>
+              <span className="text-slate-600">|</span>
+              <span className="text-emerald-400 font-semibold" title="Matriz de piezas">
+                {workpiece.arrayCols * workpiece.arrayRows} piezas ({workpiece.arrayCols}×{workpiece.arrayRows})
+              </span>
+            </>
+          )}
           {cutFeedRate !== undefined && (
             <>
               <span className="text-slate-600">|</span>

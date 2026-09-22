@@ -315,6 +315,11 @@ export default function App() {
                 onLockAspectRatioChange={setLockAspectRatio}
                 unit={plasmaConfig.unit}
                 detectedPathsCount={detectedPathsCount}
+                workpiece={workpiece}
+                autoFitSvgResult={autoFitSvgResult}
+                onApplySvgAutoFit={handleApplySvgAutoFit}
+                currentCutWidth={toolpath.bounds.width}
+                currentCutHeight={toolpath.bounds.height}
               />
             )}
 
@@ -392,6 +397,7 @@ export default function App() {
                 unit={plasmaConfig.unit}
                 fileName={currentDownloadName}
                 controllerMode={plasmaConfig.controllerMode}
+                workpiece={workpiece}
               />
             </div>
           </div>

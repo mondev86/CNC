@@ -82,10 +82,17 @@ export interface WorkpieceConfig {
   width: number;             // mm (e.g. 600)
   height: number;            // mm (e.g. 400)
   margin: number;            // mm (e.g. 20)
-  positionMode: 'origin_with_margin' | 'center' | 'absolute_zero';
+  positionMode: 'origin_with_margin' | 'center' | 'absolute_zero' | 'manual_offset';
   rotationAngle: number;     // degrees (-180 to 180 or 0 to 360)
   rotationPivot: 'center' | 'origin';
   useG10Rotation?: boolean;  // whether to include G10 L2 P1 R... in G-code header
+  offsetX?: number;          // manual X offset in mm
+  offsetY?: number;          // manual Y offset in mm
+  // Array / Multi-piece nesting
+  arrayCols?: number;        // copies along X (default 1)
+  arrayRows?: number;        // copies along Y (default 1)
+  arrayGapX?: number;        // gap between parts along X in mm (default 10)
+  arrayGapY?: number;        // gap between parts along Y in mm (default 10)
 }
 
 export interface SheetPreset {

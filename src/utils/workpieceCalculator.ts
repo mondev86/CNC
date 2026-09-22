@@ -1,6 +1,18 @@
 import { FontStyleType, WorkpieceConfig, Point2D } from '../types';
 import { generateTextVectorLoops } from './plasmaFonts';
 
+/**
+ * ============================================================================
+ * MÓDULO: CALCULADORA GEOMÉTRICA DE CHAPA, ROTACIÓN Y MATRIZ
+ * Archivo: src/utils/workpieceCalculator.ts
+ * ============================================================================
+ * Este módulo contiene toda la lógica matemática 2D para:
+ * 1. Rotar figuras a cualquier ángulo respetando un punto pivote.
+ * 2. Calcular desplazamientos manuales (X/Y) para aprovechar retazos.
+ * 3. Replicar figuras en matrices de filas y columnas (Nesting simple).
+ * 4. Calcular el escalado óptimo de textos y archivos SVG para no salirse de la chapa.
+ */
+
 export interface AutoFitTextResult {
   recommendedFontSize: number;
   estimatedWidth: number;
@@ -19,7 +31,10 @@ export interface AutoFitSvgResult {
 }
 
 /**
- * Rotates a 2D point around a given pivot by angle in radians
+ * Rota un punto 2D (p) alrededor de un centro pivote usando trigonometría pura.
+ * Matriz de rotación en 2D:
+ * x' = pivot.x + (dx * cos - dy * sin)
+ * y' = pivot.y + (dx * sin + dy * cos)
  */
 export function rotatePoint(p: Point2D, pivot: Point2D, angleRad: number): Point2D {
   if (Math.abs(angleRad) < 1e-6) return { x: p.x, y: p.y };
@@ -34,7 +49,12 @@ export function rotatePoint(p: Point2D, pivot: Point2D, angleRad: number): Point
 }
 
 /**
- * Calculates transformed and positioned loops according to scale, rotation angle, pivot, and workpiece plate
+ * Transforma los bucles vectoriales originales según:
+ * - Escala deseada
+ * - Ángulo de inclinación (° rotación)
+ * - Modo de anclaje en la chapa (centrado, origen con margen, etc.)
+ * - Desplazamiento manual en X e Y
+ * - Matriz de piezas (filas × columnas con separación)
  */
 export function transformLoops(
   rawLoops: { points: Point2D[]; isClosed: boolean }[],
@@ -44,6 +64,7 @@ export function transformLoops(
   transformedLoops: { points: Point2D[]; isClosed: boolean }[];
   bounds: { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number };
 } {
+  // Retorno seguro en caso de no haber trayectorias cargadas
   if (rawLoops.length === 0) {
     return {
       transformedLoops: [],
@@ -51,7 +72,9 @@ export function transformLoops(
     };
   }
 
-  // 1. Compute initial bounding box of scaled points
+  // --------------------------------------------------------------------------
+  // BLOQUE 1: Calcular la envolvente (Bounding Box) de la figura original escalada
+  // --------------------------------------------------------------------------
   let rawMinX = Infinity;
   let rawMinY = Infinity;
   let rawMaxX = -Infinity;
@@ -75,14 +98,15 @@ export function transformLoops(
   const rawCenterX = (rawMinX + rawMaxX) / 2;
   const rawCenterY = (rawMinY + rawMaxY) / 2;
 
-  // Pivot selection
+  // --------------------------------------------------------------------------
+  // BLOQUE 2: Determinar el pivote y rotar cada punto
+  // --------------------------------------------------------------------------
   const pivot: Point2D = workpiece.rotationPivot === 'origin'
     ? { x: 0, y: 0 }
     : { x: rawCenterX, y: rawCenterY };
 
   const angleRad = ((workpiece.rotationAngle || 0) * Math.PI) / 180;
 
-  // 2. Rotate all points
   const rotatedLoops = rawLoops.map(loop => ({
     isClosed: loop.isClosed,
     points: loop.points.map(p => {
@@ -92,7 +116,9 @@ export function transformLoops(
     })
   }));
 
-  // 3. Find rotated bounds
+  // --------------------------------------------------------------------------
+  // BLOQUE 3: Calcular límites de la figura ya rotada
+  // --------------------------------------------------------------------------
   let rotMinX = Infinity;
   let rotMinY = Infinity;
   let rotMaxX = -Infinity;
@@ -112,44 +138,78 @@ export function transformLoops(
   const rotCenterX = (rotMinX + rotMaxX) / 2;
   const rotCenterY = (rotMinY + rotMaxY) / 2;
 
-  // 4. Calculate translation offsets based on workpiece configuration
+  // --------------------------------------------------------------------------
+  // BLOQUE 4: Calcular desplazamientos base según la chapa y el desplazamiento manual
+  // --------------------------------------------------------------------------
   let shiftX = 0;
   let shiftY = 0;
+
+  const userOffsetX = workpiece.offsetX || 0;
+  const userOffsetY = workpiece.offsetY || 0;
 
   if (workpiece.enabled && workpiece.positionMode !== 'absolute_zero') {
     if (workpiece.positionMode === 'center') {
       const targetCenterX = workpiece.width / 2;
       const targetCenterY = workpiece.height / 2;
-      shiftX = targetCenterX - rotCenterX;
-      shiftY = targetCenterY - rotCenterY;
+      shiftX = (targetCenterX - rotCenterX) + userOffsetX;
+      shiftY = (targetCenterY - rotCenterY) + userOffsetY;
+    } else if (workpiece.positionMode === 'manual_offset') {
+      shiftX = userOffsetX - rotMinX;
+      shiftY = userOffsetY - rotMinY;
     } else {
-      // 'origin_with_margin'
-      shiftX = workpiece.margin - rotMinX;
-      shiftY = workpiece.margin - rotMinY;
+      // 'origin_with_margin' (esquina inferior izquierda respetando margen de seguridad)
+      shiftX = workpiece.margin - rotMinX + userOffsetX;
+      shiftY = workpiece.margin - rotMinY + userOffsetY;
     }
+  } else {
+    // Modo cero absoluto directo
+    shiftX = userOffsetX;
+    shiftY = userOffsetY;
   }
 
-  // 5. Apply final shift
+  // --------------------------------------------------------------------------
+  // BLOQUE 5: Replicación en matriz (Columnas en X, Filas en Y)
+  // --------------------------------------------------------------------------
+  const cols = Math.max(1, workpiece.arrayCols || 1);
+  const rows = Math.max(1, workpiece.arrayRows || 1);
+  const gapX = workpiece.arrayGapX !== undefined ? workpiece.arrayGapX : 10;
+  const gapY = workpiece.arrayGapY !== undefined ? workpiece.arrayGapY : 10;
+
+  const pitchX = rotWidth + gapX;
+  const pitchY = rotHeight + gapY;
+
+  const allLoops: { points: Point2D[]; isClosed: boolean }[] = [];
+
   let finalMinX = Infinity;
   let finalMinY = Infinity;
   let finalMaxX = -Infinity;
   let finalMaxY = -Infinity;
 
-  const transformedLoops = rotatedLoops.map(loop => ({
-    isClosed: loop.isClosed,
-    points: loop.points.map(p => {
-      const fx = p.x + shiftX;
-      const fy = p.y + shiftY;
-      if (fx < finalMinX) finalMinX = fx;
-      if (fy < finalMinY) finalMinY = fy;
-      if (fx > finalMaxX) finalMaxX = fx;
-      if (fy > finalMaxY) finalMaxY = fy;
-      return { x: fx, y: fy };
-    })
-  }));
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const stepX = shiftX + c * pitchX;
+      const stepY = shiftY + r * pitchY;
+
+      rotatedLoops.forEach(loop => {
+        const shiftedPoints = loop.points.map(p => {
+          const fx = p.x + stepX;
+          const fy = p.y + stepY;
+          if (fx < finalMinX) finalMinX = fx;
+          if (fy < finalMinY) finalMinY = fy;
+          if (fx > finalMaxX) finalMaxX = fx;
+          if (fy > finalMaxY) finalMaxY = fy;
+          return { x: fx, y: fy };
+        });
+        allLoops.push({
+          isClosed: loop.isClosed,
+          points: shiftedPoints
+        });
+      });
+    }
+  }
 
   return {
-    transformedLoops,
+    transformedLoops: allLoops,
     bounds: {
       minX: finalMinX,
       minY: finalMinY,
@@ -162,21 +222,48 @@ export function transformLoops(
 }
 
 /**
- * Calculates optimal font size so that the text (even when rotated)
- * fits comfortably inside the selected standard workpiece/sheet with safety margins.
+ * Calcula la altura de letra óptima para que un texto quepa perfectamente en la chapa,
+ * teniendo en cuenta el ángulo de inclinación seleccionado y los márgenes de seguridad.
+ * Admite parámetros directos o el objeto WorkpieceConfig.
  */
 export function calculateOptimalTextSize(
   text: string,
   fontType: FontStyleType,
-  workpieceWidth: number,
-  workpieceHeight: number,
-  margin: number = 20,
-  letterSpacing: number = 4,
-  lineSpacing: number = 1.3,
-  rotationAngle: number = 0
+  widthOrLetterSpacing: number,
+  heightOrLineSpacing: number,
+  marginOrWorkpiece: number | WorkpieceConfig,
+  letterSpacing?: number,
+  lineSpacing?: number,
+  rotationAngle?: number
 ): AutoFitTextResult {
-  const cleanText = text.trim();
-  if (!cleanText) {
+  // Manejo polimórfico de argumentos
+  let plateWidth = 600;
+  let plateHeight = 400;
+  let plateMargin = 20;
+  let plateAngle = 0;
+  let lSpacing = 1.0;
+  let lnSpacing = 1.3;
+
+  if (typeof marginOrWorkpiece === 'object') {
+    // Firma: (text, fontType, letterSpacing, lineSpacing, workpiece)
+    lSpacing = widthOrLetterSpacing;
+    lnSpacing = heightOrLineSpacing;
+    plateWidth = marginOrWorkpiece.width;
+    plateHeight = marginOrWorkpiece.height;
+    plateMargin = marginOrWorkpiece.margin;
+    plateAngle = marginOrWorkpiece.rotationAngle || 0;
+  } else {
+    // Firma: (text, fontType, width, height, margin, letterSpacing, lineSpacing, rotationAngle)
+    plateWidth = widthOrLetterSpacing;
+    plateHeight = heightOrLineSpacing;
+    plateMargin = marginOrWorkpiece;
+    lSpacing = letterSpacing !== undefined ? letterSpacing : 1.0;
+    lnSpacing = lineSpacing !== undefined ? lineSpacing : 1.3;
+    plateAngle = rotationAngle || 0;
+  }
+
+  const trimmed = text.trim();
+  if (!trimmed) {
     return {
       recommendedFontSize: 50,
       estimatedWidth: 0,
@@ -186,92 +273,74 @@ export function calculateOptimalTextSize(
     };
   }
 
-  const usableWidth = Math.max(50, workpieceWidth - margin * 2);
-  const usableHeight = Math.max(30, workpieceHeight - margin * 2);
+  const usableW = Math.max(50, plateWidth - plateMargin * 2);
+  const usableH = Math.max(50, plateHeight - plateMargin * 2);
 
-  const angleRad = (rotationAngle * Math.PI) / 180;
+  // Generar bucles de prueba con altura de referencia 100 mm
+  const sampleFontSize = 100;
+  const sampleLoops = generateTextVectorLoops(trimmed, fontType, sampleFontSize, lSpacing, lnSpacing);
 
-  // Helper to measure rotated bounding box dimensions of loops
-  const measureRotatedDims = (loops: { points: Point2D[] }[]) => {
-    let minX = Infinity; let minY = Infinity;
-    let maxX = -Infinity; let maxY = -Infinity;
-    loops.forEach(l => {
-      l.points.forEach(p => {
-        if (p.x < minX) minX = p.x;
-        if (p.y < minY) minY = p.y;
-        if (p.x > maxX) maxX = p.x;
-        if (p.y > maxY) maxY = p.y;
-      });
-    });
-    const pivot = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
-
-    let rMinX = Infinity; let rMinY = Infinity;
-    let rMaxX = -Infinity; let rMaxY = -Infinity;
-    loops.forEach(l => {
-      l.points.forEach(p => {
-        const rp = rotatePoint(p, pivot, angleRad);
-        if (rp.x < rMinX) rMinX = rp.x;
-        if (rp.y < rMinY) rMinY = rp.y;
-        if (rp.x > rMaxX) rMaxX = rp.x;
-        if (rp.y > rMaxY) rMaxY = rp.y;
-      });
-    });
-    return {
-      w: Math.max(1, rMaxX - rMinX),
-      h: Math.max(1, rMaxY - rMinY)
-    };
+  const testConfig: WorkpieceConfig = {
+    enabled: true,
+    width: plateWidth,
+    height: plateHeight,
+    margin: plateMargin,
+    positionMode: 'absolute_zero',
+    rotationAngle: plateAngle,
+    rotationPivot: 'center',
+    arrayCols: 1,
+    arrayRows: 1,
+    offsetX: 0,
+    offsetY: 0
   };
 
-  // Measure text at standard reference size (100mm)
-  const refResult = generateTextVectorLoops(cleanText, fontType, 100, letterSpacing, lineSpacing);
-  const refRot = measureRotatedDims(refResult.loops);
+  const { bounds: sampleBounds } = transformLoops(sampleLoops.loops, 1.0, testConfig);
 
-  // Ratio to fit inside usable box
-  const scaleX = usableWidth / refRot.w;
-  const scaleY = usableHeight / refRot.h;
-  const optimalRatio = Math.min(scaleX, scaleY);
+  const sampleW = Math.max(1, sampleBounds.width);
+  const sampleH = Math.max(1, sampleBounds.height);
 
-  // Calculate font size (clamped between 15mm and 200mm)
-  let recommendedFontSize = Math.floor(100 * optimalRatio);
-  recommendedFontSize = Math.max(15, Math.min(200, recommendedFontSize));
+  const scaleByWidth = usableW / sampleW;
+  const scaleByHeight = usableH / sampleH;
+  const idealScale = Math.min(scaleByWidth, scaleByHeight) * 0.95; // 95% de factor de seguridad
 
-  // Compute estimated dimensions at recommended font size
-  const actualResult = generateTextVectorLoops(cleanText, fontType, recommendedFontSize, letterSpacing, lineSpacing);
-  const actualRot = measureRotatedDims(actualResult.loops);
+  const recommendedFontSize = Math.max(15, Math.min(400, Math.floor(sampleFontSize * idealScale)));
 
-  // Check if splitting into multiple lines is possible and beneficial
-  const words = cleanText.split(/\s+/);
+  const estimatedWidth = Math.round((sampleW / sampleFontSize) * recommendedFontSize);
+  const estimatedHeight = Math.round((sampleH / sampleFontSize) * recommendedFontSize);
+  const fitsInside = estimatedWidth <= usableW && estimatedHeight <= usableH;
+
+  // Evaluar recomendación de división en dos líneas si el texto es muy largo
+  const words = trimmed.split(/\s+/);
   let canSplitLines = false;
   let splitTextRecommendation: string | undefined;
   let splitFontSizeRecommendation: number | undefined;
 
-  if (words.length >= 2 && !cleanText.includes('\n')) {
-    canSplitLines = true;
+  if (words.length >= 2 && !trimmed.includes('\n')) {
     const mid = Math.ceil(words.length / 2);
     const line1 = words.slice(0, mid).join(' ');
     const line2 = words.slice(mid).join(' ');
-    const candidate2Lines = `${line1}\n${line2}`;
+    const splitText = `${line1}\n${line2}`;
 
-    const ref2Lines = generateTextVectorLoops(candidate2Lines, fontType, 100, letterSpacing, lineSpacing);
-    const ref2Rot = measureRotatedDims(ref2Lines.loops);
-    const scale2X = usableWidth / ref2Rot.w;
-    const scale2Y = usableHeight / ref2Rot.h;
-    const ratio2 = Math.min(scale2X, scale2Y);
-    let optFont2 = Math.floor(100 * ratio2);
-    optFont2 = Math.max(15, Math.min(200, optFont2));
+    const splitLoops = generateTextVectorLoops(splitText, fontType, sampleFontSize, lSpacing, lnSpacing);
+    const { bounds: splitBounds } = transformLoops(splitLoops.loops, 1.0, testConfig);
 
-    // If 2 lines gives a significantly bigger font (e.g. >= 20% larger), recommend it!
-    if (optFont2 > recommendedFontSize * 1.15) {
-      splitTextRecommendation = candidate2Lines;
-      splitFontSizeRecommendation = optFont2;
+    const splitW = Math.max(1, splitBounds.width);
+    const splitH = Math.max(1, splitBounds.height);
+    const splitIdealScale = Math.min(usableW / splitW, usableH / splitH) * 0.95;
+    const splitFontSize = Math.max(15, Math.min(400, Math.floor(sampleFontSize * splitIdealScale)));
+
+    if (splitFontSize > recommendedFontSize * 1.2) {
+      canSplitLines = true;
+      splitTextRecommendation = splitText;
+      splitFontSizeRecommendation = splitFontSize;
     }
   }
 
   return {
     recommendedFontSize,
-    estimatedWidth: Math.round(actualRot.w),
-    estimatedHeight: Math.round(actualRot.h),
-    fitsInside: actualRot.w <= usableWidth && actualRot.h <= usableHeight,
+    estimatedWidth,
+    estimatedHeight,
+    fitsInside,
     canSplitLines,
     splitTextRecommendation,
     splitFontSizeRecommendation
@@ -279,65 +348,47 @@ export function calculateOptimalTextSize(
 }
 
 /**
- * Calculates optimal SVG dimensions to fit within the workpiece (accounting for rotation)
+ * Calcula las dimensiones óptimas para un archivo SVG para que quepa dentro de la chapa.
+ * Exportada para compatibilidad directa con App.tsx.
  */
 export function calculateOptimalSvgDimensions(
-  originalWidth: number,
-  originalHeight: number,
+  svgWidth: number,
+  svgHeight: number,
   workpieceWidth: number,
   workpieceHeight: number,
-  margin: number = 20,
+  margin: number,
   rotationAngle: number = 0
 ): AutoFitSvgResult {
-  const usableWidth = Math.max(50, workpieceWidth - margin * 2);
-  const usableHeight = Math.max(30, workpieceHeight - margin * 2);
+  const usableW = Math.max(50, workpieceWidth - margin * 2);
+  const usableH = Math.max(50, workpieceHeight - margin * 2);
 
-  const safeW = Math.max(1, originalWidth);
-  const safeH = Math.max(1, originalHeight);
+  const rawW = Math.max(1, svgWidth);
+  const rawH = Math.max(1, svgHeight);
 
-  const rad = (rotationAngle * Math.PI) / 180;
-  const rotW = Math.abs(safeW * Math.cos(rad)) + Math.abs(safeH * Math.sin(rad));
-  const rotH = Math.abs(safeW * Math.sin(rad)) + Math.abs(safeH * Math.cos(rad));
+  // Considerar rotación geométrica
+  const rad = (Math.abs(rotationAngle) * Math.PI) / 180;
+  const sin = Math.sin(rad);
+  const cos = Math.cos(rad);
 
-  const scaleX = usableWidth / Math.max(1, rotW);
-  const scaleY = usableHeight / Math.max(1, rotH);
-  const scaleFactor = Math.min(scaleX, scaleY);
+  const rotatedW = rawW * cos + rawH * sin;
+  const rotatedH = rawW * sin + rawH * cos;
 
-  const targetWidth = Math.round(safeW * scaleFactor);
-  const targetHeight = Math.round(safeH * scaleFactor);
+  const scaleX = usableW / Math.max(1, rotatedW);
+  const scaleY = usableH / Math.max(1, rotatedH);
+  const fitScale = Math.min(scaleX, scaleY) * 0.98;
+
+  const targetWidth = Math.max(10, Math.round(rawW * fitScale));
+  const targetHeight = Math.max(10, Math.round(rawH * fitScale));
 
   return {
     targetWidth,
     targetHeight,
-    scaleFactor,
-    fitsInside: (rotW * scaleFactor) <= usableWidth && (rotH * scaleFactor) <= usableHeight
+    scaleFactor: fitScale,
+    fitsInside: targetWidth <= usableW && targetHeight <= usableH
   };
 }
 
 /**
- * Legacy compatibility helper
+ * Alias de calculateOptimalSvgDimensions
  */
-export function calculateWorkpieceOffsets(
-  contentWidth: number,
-  contentHeight: number,
-  workpiece: WorkpieceConfig
-): { offsetX: number; offsetY: number } {
-  if (!workpiece.enabled || workpiece.positionMode === 'absolute_zero') {
-    return { offsetX: 0, offsetY: 0 };
-  }
-
-  if (workpiece.positionMode === 'center') {
-    const rawOffsetX = (workpiece.width - contentWidth) / 2;
-    const rawOffsetY = (workpiece.height - contentHeight) / 2;
-    return {
-      offsetX: Math.max(workpiece.margin, Math.round(rawOffsetX * 10) / 10),
-      offsetY: Math.max(workpiece.margin, Math.round(rawOffsetY * 10) / 10)
-    };
-  }
-
-  // 'origin_with_margin'
-  return {
-    offsetX: workpiece.margin,
-    offsetY: workpiece.margin
-  };
-}
+export const calculateOptimalSvgScale = calculateOptimalSvgDimensions;

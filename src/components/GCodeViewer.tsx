@@ -7,13 +7,15 @@ interface GCodeViewerProps {
   unit: 'mm' | 'inch';
   fileName?: string;
   controllerMode?: ControllerMode;
+  workpiece?: import('../types').WorkpieceConfig;
 }
 
 export const GCodeViewer: React.FC<GCodeViewerProps> = ({
   toolpath,
   unit,
   fileName = 'corte_plasma.ngc',
-  controllerMode = 'qtplasmac'
+  controllerMode = 'qtplasmac',
+  workpiece
 }) => {
   const [copied, setCopied] = useState<boolean>(false);
 
@@ -43,8 +45,22 @@ export const GCodeViewer: React.FC<GCodeViewerProps> = ({
   const minutes = Math.floor(toolpath.estimatedTimeSeconds / 60);
   const seconds = toolpath.estimatedTimeSeconds % 60;
 
+  const usableW = workpiece ? workpiece.width - workpiece.margin * 2 : 10000;
+  const usableH = workpiece ? workpiece.height - workpiece.margin * 2 : 10000;
+  const exceedsTable = workpiece?.enabled && (toolpath.bounds.width > usableW || toolpath.bounds.height > usableH);
+
   return (
     <div id="gcode-viewer-container" className="flex flex-col h-full bg-white rounded-xl border border-stone-200 overflow-hidden shadow-xs">
+      {/* Exceeds Table Alert in G-Code viewer */}
+      {exceedsTable && (
+        <div className="bg-amber-500 text-stone-950 px-4 py-2 text-xs font-bold flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span>⚠️ ATENCIÓN: El diseño actual sobrepasa los límites de tu chapa de trabajo ({workpiece.width}×{workpiece.height} mm).</span>
+          </div>
+          <span className="text-[11px] font-normal underline">Usa 'Ajustar a Mesa' o reduce las medidas antes de cortar</span>
+        </div>
+      )}
+
       {/* Quick Statistics Strip */}
       <div id="gcode-stats-strip" className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-stone-50 border-b border-stone-200 text-xs">
         <div id="stat-dimensions" className="flex items-center gap-2.5">
