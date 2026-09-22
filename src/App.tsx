@@ -4,11 +4,16 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { PlasmaConfig, FontStyleType, ToolpathData } from './types';
+import { PlasmaConfig, FontStyleType, ToolpathData, WorkpieceConfig } from './types';
 import { generateTextVectorLoops } from './utils/plasmaFonts';
 import { parseSvgContent } from './utils/svgParser';
 import { generatePlasmaToolpath } from './utils/gcodeGenerator';
 import { SAMPLE_SVGS } from './utils/sampleSvgs';
+import {
+  calculateOptimalTextSize,
+  calculateOptimalSvgDimensions,
+  transformLoops
+} from './utils/workpieceCalculator';
 import { CanvasVisualizer } from './components/CanvasVisualizer';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { GCodeViewer } from './components/GCodeViewer';
@@ -17,37 +22,51 @@ import { SvgConverterPanel } from './components/SvgConverterPanel';
 import { PlasmaSettingsPanel } from './components/PlasmaSettingsPanel';
 import { DesktopInstallModal } from './components/DesktopInstallModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { WorkpieceBar } from './components/WorkpieceBar';
 import { Type, FileCode, Settings2, Flame, Wrench, ShieldCheck, Laptop } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'text' | 'svg'>('text');
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
+  // Workpiece / Pizarra / Worktable configuration (Standard 600x400 mm for Debian QtPlasmaC & shop tables)
+  const [workpiece, setWorkpiece] = useState<WorkpieceConfig>({
+    enabled: true,
+    width: 600,
+    height: 400,
+    margin: 20,
+    positionMode: 'origin_with_margin',
+    rotationAngle: 0,
+    rotationPivot: 'center',
+    useG10Rotation: false
+  });
+
   // Text generator state
   const [text, setText] = useState<string>('LINUXCNC PLASMA');
   const [fontType, setFontType] = useState<FontStyleType>('stencil');
-  const [fontSize, setFontSize] = useState<number>(45);
+  const [fontSize, setFontSize] = useState<number>(38); // Standard size to fit in 600x400 with 20mm margin
   const [letterSpacing, setLetterSpacing] = useState<number>(4);
   const [lineSpacing, setLineSpacing] = useState<number>(1.3);
 
   // SVG converter state
   const [svgContent, setSvgContent] = useState<string>(SAMPLE_SVGS[0].svg);
   const [svgFileName, setSvgFileName] = useState<string>('soporte_escuadra.svg');
-  const [targetWidth, setTargetWidth] = useState<number>(150);
-  const [targetHeight, setTargetHeight] = useState<number>(100);
+  const [targetWidth, setTargetWidth] = useState<number>(180);
+  const [targetHeight, setTargetHeight] = useState<number>(120);
   const [lockAspectRatio, setLockAspectRatio] = useState<boolean>(true);
 
   // LinuxCNC Plasma machine configuration
   const [plasmaConfig, setPlasmaConfig] = useState<PlasmaConfig>({
     unit: 'mm',
+    controllerMode: 'qtplasmac',
     cutFeedRate: 1800,
     rapidFeedRate: 6000,
     safeZ: 25.0,
     pierceHeightZ: 3.8,
     cutHeightZ: 1.5,
     pierceDelay: 0.6,
-    torchOnCommand: 'M3 S1',
-    torchOffCommand: 'M5',
+    torchOnCommand: 'M3 $0 S1',
+    torchOffCommand: 'M5 $0',
     enableTouchOff: false,
     probeFeedRate: 400,
     switchOffset: 1.2,
@@ -59,7 +78,53 @@ export default function App() {
     g64Tolerance: 0.1
   });
 
-  // Calculate toolpath based on current mode
+  // Auto-fit calculations for text and SVG relative to the workpiece (considering rotation angle)
+  const autoFitTextResult = useMemo(() => {
+    return calculateOptimalTextSize(
+      text,
+      fontType,
+      workpiece.width,
+      workpiece.height,
+      workpiece.margin,
+      letterSpacing,
+      lineSpacing,
+      workpiece.rotationAngle || 0
+    );
+  }, [text, fontType, workpiece.width, workpiece.height, workpiece.margin, letterSpacing, lineSpacing, workpiece.rotationAngle]);
+
+  const svgParsedInfo = useMemo(() => {
+    return parseSvgContent(svgContent);
+  }, [svgContent]);
+
+  const autoFitSvgResult = useMemo(() => {
+    return calculateOptimalSvgDimensions(
+      svgParsedInfo.bounds.width,
+      svgParsedInfo.bounds.height,
+      workpiece.width,
+      workpiece.height,
+      workpiece.margin,
+      workpiece.rotationAngle || 0
+    );
+  }, [svgParsedInfo.bounds.width, svgParsedInfo.bounds.height, workpiece.width, workpiece.height, workpiece.margin, workpiece.rotationAngle]);
+
+  const handleApplySvgAutoFit = () => {
+    if (autoFitSvgResult) {
+      setTargetWidth(autoFitSvgResult.targetWidth);
+      setTargetHeight(autoFitSvgResult.targetHeight);
+    }
+  };
+
+  const handleAutoFitToWorkpiece = () => {
+    if (activeTab === 'text') {
+      if (autoFitTextResult) {
+        setFontSize(autoFitTextResult.recommendedFontSize);
+      }
+    } else {
+      handleApplySvgAutoFit();
+    }
+  };
+
+  // Calculate toolpath with full trigonometric rotation, workpiece positioning & offsets
   const { toolpath, detectedPathsCount } = useMemo(() => {
     if (activeTab === 'text') {
       const textResult = generateTextVectorLoops(
@@ -70,9 +135,19 @@ export default function App() {
         lineSpacing
       );
 
-      const generated = generatePlasmaToolpath(
+      const { transformedLoops } = transformLoops(
         textResult.loops,
-        plasmaConfig
+        1.0,
+        workpiece
+      );
+
+      const generated = generatePlasmaToolpath(
+        transformedLoops,
+        plasmaConfig,
+        1.0,
+        0,
+        0,
+        workpiece.useG10Rotation ? workpiece.rotationAngle : undefined
       );
 
       return {
@@ -81,15 +156,30 @@ export default function App() {
       };
     } else {
       // SVG mode
-      const svgResult = parseSvgContent(svgContent);
+      const rawWidth = Math.max(1, svgParsedInfo.bounds.width);
+      const rawHeight = Math.max(1, svgParsedInfo.bounds.height);
+      const scaleX = targetWidth / rawWidth;
+      const scaleY = targetHeight / rawHeight;
+      const scale = lockAspectRatio ? Math.min(scaleX, scaleY) : scaleX;
+
+      const { transformedLoops } = transformLoops(
+        svgParsedInfo.paths,
+        scale,
+        workpiece
+      );
+
       const generated = generatePlasmaToolpath(
-        svgResult.paths,
-        plasmaConfig
+        transformedLoops,
+        plasmaConfig,
+        1.0,
+        0,
+        0,
+        workpiece.useG10Rotation ? workpiece.rotationAngle : undefined
       );
 
       return {
         toolpath: generated,
-        detectedPathsCount: svgResult.paths.length
+        detectedPathsCount: svgParsedInfo.paths.length
       };
     }
   }, [
@@ -99,7 +189,11 @@ export default function App() {
     fontSize,
     letterSpacing,
     lineSpacing,
-    svgContent,
+    svgParsedInfo,
+    targetWidth,
+    targetHeight,
+    lockAspectRatio,
+    workpiece,
     plasmaConfig
   ]);
 
@@ -234,16 +328,38 @@ export default function App() {
             <div className="p-4 rounded-xl bg-white border border-stone-200 text-xs text-stone-600 space-y-2 shadow-xs">
               <div className="flex items-center gap-2 font-semibold text-stone-900">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>Compatibilidad LinuxCNC Certificada</span>
+                <span>
+                  {plasmaConfig.controllerMode === 'qtplasmac'
+                    ? 'Compatibilidad Nativa LinuxCNC QtPlasmaC (Modo 0)'
+                    : 'Compatibilidad LinuxCNC Estándar (Axis / Gmoccapy)'}
+                </span>
               </div>
               <p className="text-[11px] leading-relaxed text-stone-500">
-                El archivo <code>.ngc</code> generado incluye G90, G21/G20, G64 (trayectoria continua), control de antorcha M3/M5, alturas de perforación/corte y ciclo opcional G38.2 para sensor flotante (THC).
+                {plasmaConfig.controllerMode === 'qtplasmac'
+                  ? 'G-Code limpio sin eje Z: Emite M3 $0 S1 y M5 $0. QtPlasmaC en Debian gestiona automáticamente el palpado IHS, pierce delay, altura de corte y THC mediante su tabla de materiales.'
+                  : 'G-Code estándar: Incluye G90, G21/G20, G64 (trayectoria continua), control M3/M5, alturas Z de perforación/corte y ciclo opcional G38.2.'}
               </p>
             </div>
           </div>
 
           {/* Right Column: Visualizer & G-Code Inspector (7 cols) */}
           <div id="right-workspace-column" className="lg:col-span-7 space-y-5">
+            {/* Workpiece & Physical Sheet Sizing Bar */}
+            <WorkpieceBar
+              workpiece={workpiece}
+              onWorkpieceChange={setWorkpiece}
+              toolpath={toolpath}
+              activeTab={activeTab}
+              text={text}
+              onTextChange={setText}
+              fontSize={fontSize}
+              onFontSizeChange={setFontSize}
+              autoFitTextResult={autoFitTextResult}
+              autoFitSvgResult={autoFitSvgResult}
+              onApplySvgAutoFit={handleApplySvgAutoFit}
+              unit={plasmaConfig.unit}
+            />
+
             {/* 2D Interactive CAD/CAM Visualizer */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -260,6 +376,8 @@ export default function App() {
                   unit={plasmaConfig.unit}
                   cutFeedRate={plasmaConfig.cutFeedRate}
                   onOpenSettings={() => setShowSettings(true)}
+                  workpiece={workpiece}
+                  onAutoFitToWorkpiece={handleAutoFitToWorkpiece}
                 />
               </ErrorBoundary>
             </div>
@@ -273,6 +391,7 @@ export default function App() {
                 toolpath={toolpath}
                 unit={plasmaConfig.unit}
                 fileName={currentDownloadName}
+                controllerMode={plasmaConfig.controllerMode}
               />
             </div>
           </div>

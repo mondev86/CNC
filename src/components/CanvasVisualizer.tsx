@@ -1,12 +1,14 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ToolpathData, Point2D } from '../types';
-import { Play, Pause, RotateCcw, ZoomIn, ZoomOut, Maximize2, Flame, Search, Repeat, Gauge, Sliders } from 'lucide-react';
+import { ToolpathData, Point2D, WorkpieceConfig } from '../types';
+import { Play, Pause, RotateCcw, ZoomIn, ZoomOut, Maximize2, Flame, Search, Repeat, Gauge, Sliders, AlertTriangle, Sparkles } from 'lucide-react';
 
 interface CanvasVisualizerProps {
   toolpath: ToolpathData;
   unit: 'mm' | 'inch';
   cutFeedRate?: number;
   onOpenSettings?: () => void;
+  workpiece?: WorkpieceConfig;
+  onAutoFitToWorkpiece?: () => void;
 }
 
 export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
@@ -14,6 +16,8 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
   unit,
   cutFeedRate,
   onOpenSettings,
+  workpiece,
+  onAutoFitToWorkpiece,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -158,21 +162,33 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
     const hContainer = dimensions.height > 0 ? dimensions.height : 500;
 
     const bounds = toolpath?.bounds || { width: 100, height: 100, minX: 0, minY: 0 };
-    const w = Math.max(15, isFinite(bounds.width) && bounds.width > 0 ? bounds.width : 100);
-    const h = Math.max(15, isFinite(bounds.height) && bounds.height > 0 ? bounds.height : 100);
-    const minX = isFinite(bounds.minX) ? bounds.minX : 0;
-    const minY = isFinite(bounds.minY) ? bounds.minY : 0;
+    
+    // If workpiece is active, fit the union of the workpiece and the toolpath
+    let minX = isFinite(bounds.minX) ? bounds.minX : 0;
+    let minY = isFinite(bounds.minY) ? bounds.minY : 0;
+    let maxX = isFinite(bounds.maxX) ? bounds.maxX : 100;
+    let maxY = isFinite(bounds.maxY) ? bounds.maxY : 100;
+
+    if (workpiece && workpiece.enabled) {
+      minX = Math.min(minX, 0);
+      minY = Math.min(minY, 0);
+      maxX = Math.max(maxX, workpiece.width);
+      maxY = Math.max(maxY, workpiece.height);
+    }
+
+    const w = Math.max(15, maxX - minX);
+    const h = Math.max(15, maxY - minY);
 
     const padding = 70;
-    const scaleX = Math.max(0.1, (wContainer - padding * 2) / w);
-    const scaleY = Math.max(0.1, (hContainer - padding * 2) / h);
-    const fitScale = Math.max(0.5, Math.min(Math.min(scaleX, scaleY, 8), 15));
+    const scaleX = Math.max(0.05, (wContainer - padding * 2) / w);
+    const scaleY = Math.max(0.05, (hContainer - padding * 2) / h);
+    const fitScale = Math.max(0.2, Math.min(Math.min(scaleX, scaleY, 8), 15));
     setBaseFitScale(fitScale);
 
     const targetScale = fitScale * multiplier;
     setScale(targetScale);
 
-    // Center toolpath geometry in viewport
+    // Center toolpath/workpiece geometry in viewport
     const centerX = minX + w / 2;
     const centerY = minY + h / 2;
 
@@ -182,7 +198,7 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
 
     setActiveZoom(multiplier);
     setZoomFeedback(`Zoom ${multiplier}x (${Math.round(multiplier * 100)}%)`);
-  }, [toolpath?.bounds, dimensions]);
+  }, [toolpath?.bounds, dimensions, workpiece]);
 
   const handleFitToScreen = useCallback(() => {
     handleZoomPreset(1);
@@ -327,6 +343,66 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
           }
           ctx.stroke();
         }
+      }
+
+      // 2.5 Draw Workpiece / Pizarra Sheet (Physical plate)
+      if (workpiece && workpiece.enabled && workpiece.width > 0 && workpiece.height > 0) {
+        const sX0 = toScreenX(0);
+        const sYTop = toScreenY(workpiece.height);
+        const sW = workpiece.width * safeScale;
+        const sH = workpiece.height * safeScale;
+
+        // Check if cut bounds exceed the sheet
+        const exceeds = Boolean(toolpath?.bounds && (
+          toolpath.bounds.maxX > workpiece.width ||
+          toolpath.bounds.maxY > workpiece.height ||
+          toolpath.bounds.minX < 0 ||
+          toolpath.bounds.minY < 0
+        ));
+
+        // Background of the metal plate / pizarra
+        ctx.fillStyle = exceeds ? 'rgba(69, 10, 10, 0.45)' : 'rgba(30, 41, 59, 0.55)';
+        ctx.fillRect(sX0, sYTop, sW, sH);
+
+        // Plate border
+        ctx.strokeStyle = exceeds ? '#ef4444' : '#64748b';
+        ctx.lineWidth = exceeds ? 2 : 1.5;
+        ctx.strokeRect(sX0, sYTop, sW, sH);
+
+        // Safety margin boundary (dashed inside)
+        if (workpiece.margin > 0 && workpiece.width > workpiece.margin * 2 && workpiece.height > workpiece.margin * 2) {
+          const mX0 = toScreenX(workpiece.margin);
+          const mYTop = toScreenY(workpiece.height - workpiece.margin);
+          const mW = (workpiece.width - workpiece.margin * 2) * safeScale;
+          const mH = (workpiece.height - workpiece.margin * 2) * safeScale;
+
+          ctx.strokeStyle = exceeds ? 'rgba(239, 68, 68, 0.6)' : 'rgba(249, 115, 22, 0.45)';
+          ctx.setLineDash([5, 5]);
+          ctx.lineWidth = 1;
+          ctx.strokeRect(mX0, mYTop, mW, mH);
+          ctx.setLineDash([]);
+        }
+
+        // Corner tick marks on sheet
+        const tick = Math.max(6, Math.min(16, 12 * safeScale));
+        ctx.strokeStyle = exceeds ? '#ef4444' : '#94a3b8';
+        ctx.lineWidth = 1.5;
+        // Top-left
+        ctx.beginPath();
+        ctx.moveTo(sX0, sYTop + tick); ctx.lineTo(sX0, sYTop); ctx.lineTo(sX0 + tick, sYTop);
+        // Top-right
+        ctx.moveTo(sX0 + sW - tick, sYTop); ctx.lineTo(sX0 + sW, sYTop); ctx.lineTo(sX0 + sW, sYTop + tick);
+        // Bottom-left
+        ctx.moveTo(sX0, sYTop + sH - tick); ctx.lineTo(sX0, sYTop + sH); ctx.lineTo(sX0 + tick, sYTop + sH);
+        // Bottom-right
+        ctx.moveTo(sX0 + sW - tick, sYTop + sH); ctx.lineTo(sX0 + sW, sYTop + sH); ctx.lineTo(sX0 + sW, sYTop + sH - tick);
+        ctx.stroke();
+
+        // Label on plate
+        ctx.fillStyle = exceeds ? '#fca5a5' : '#94a3b8';
+        ctx.font = '10px monospace';
+        const angText = workpiece.rotationAngle ? ` | Ángulo: ${workpiece.rotationAngle}°` : '';
+        ctx.fillText(`PIZARRA: ${workpiece.width} × ${workpiece.height} mm (Margen ${workpiece.margin} mm${angText})`, sX0 + 8, sYTop + 14);
       }
 
       // 3. Origin axes (0,0)
@@ -529,7 +605,7 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
     } finally {
       ctx.restore();
     }
-  }, [toolpath, scale, offset, progress, flatAnimationSteps, unit, dimensions, isPlaying]);
+  }, [toolpath, scale, offset, progress, flatAnimationSteps, unit, dimensions, isPlaying, workpiece]);
 
   // Mouse pan & zoom handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -659,6 +735,37 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
         </div>
       )}
 
+      {/* Exceeds Workpiece Warning Banner */}
+      {workpiece?.enabled && (
+        (() => {
+          const b = toolpath?.bounds;
+          const exceeds = Boolean(b && (b.maxX > workpiece.width || b.maxY > workpiece.height || b.minX < 0 || b.minY < 0));
+          if (!exceeds) return null;
+          return (
+            <div
+              id="exceeds-pizarra-banner"
+              className="absolute top-14 left-3 z-20 flex items-center gap-2.5 bg-red-950/90 border border-red-500/80 backdrop-blur-md px-3.5 py-2 rounded-xl text-xs text-red-200 shadow-2xl pointer-events-auto"
+            >
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 animate-pulse" />
+              <div>
+                <span className="font-semibold text-red-200">No alcanza en la pizarra ({workpiece.width} × {workpiece.height} mm)</span>
+                <span className="text-[11px] text-red-300 ml-1.5 hidden sm:inline">El corte sobrepasa el área física de la chapa.</span>
+              </div>
+              {onAutoFitToWorkpiece && (
+                <button
+                  type="button"
+                  onClick={onAutoFitToWorkpiece}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-medium text-xs shadow-sm transition-colors cursor-pointer ml-1"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Ajustar para que quepa</span>
+                </button>
+              )}
+            </div>
+          );
+        })()
+      )}
+
       {/* Top HUD Overlay: Coordinate readout & Legend */}
       <div
         id="canvas-top-hud"
@@ -676,6 +783,15 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
             <Gauge className="w-3 h-3 text-amber-400" />
             <span className="text-amber-300 font-semibold">{simSpeed}x</span>
           </span>
+          {workpiece?.rotationAngle !== undefined && workpiece.rotationAngle !== 0 && (
+            <>
+              <span className="text-slate-600">|</span>
+              <span className="text-orange-400 font-semibold flex items-center gap-0.5" title="Ángulo de inclinación / rotación">
+                <span>∠</span>
+                <span>{workpiece.rotationAngle}°</span>
+              </span>
+            </>
+          )}
           {cutFeedRate !== undefined && (
             <>
               <span className="text-slate-600">|</span>

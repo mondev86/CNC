@@ -51,7 +51,8 @@ export function generatePlasmaToolpath(
   config: PlasmaConfig,
   customScale: number = 1.0,
   offsetX: number = 0,
-  offsetY: number = 0
+  offsetY: number = 0,
+  g10Angle?: number
 ): ToolpathData {
   const loops: ToolpathLoop[] = [];
   let totalCutLength = 0;
@@ -188,7 +189,7 @@ export function generatePlasmaToolpath(
     maxY,
     width: Math.max(0, maxX - minX),
     height: Math.max(0, maxY - minY)
-  }, totalCutLength, estimatedTimeSeconds);
+  }, totalCutLength, estimatedTimeSeconds, g10Angle);
 
   return {
     loops,
@@ -216,21 +217,38 @@ function formatLinuxCncGcode(
   config: PlasmaConfig,
   bounds: { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number },
   totalCutLen: number,
-  estSeconds: number
+  estSeconds: number,
+  g10Angle?: number
 ): string {
+  const isQtPlasmaC = config.controllerMode === 'qtplasmac';
   const u = config.unit === 'inch' ? 'G20 (Imperial Units - Inches)' : 'G21 (Metric Units - mm)';
   const unitLabel = config.unit === 'inch' ? 'in' : 'mm';
   const unitPerMin = config.unit === 'inch' ? 'IPM' : 'mm/min';
 
   const f3 = (n: number) => n.toFixed(3);
 
+  // Normalize torch commands for QtPlasmaC (defaulting to Spindle 0: M3 $0 S1 and M5 $0)
+  const torchOnCmd = isQtPlasmaC && !config.torchOnCommand.includes('$')
+    ? 'M3 $0 S1'
+    : config.torchOnCommand;
+  const torchOffCmd = isQtPlasmaC && !config.torchOffCommand.includes('$')
+    ? 'M5 $0'
+    : config.torchOffCommand;
+
+  const hasG10 = g10Angle !== undefined && Math.abs(g10Angle) > 0.001;
+
   const lines: string[] = [
     `( ------------------------------------------------------------ )`,
-    `( PROGRAMA DE CORTE PLASMA - LINUXCNC NGC                      )`,
-    `( Generado para cortadora CNC de plasma con control de antorcha )`,
+    isQtPlasmaC
+      ? `( PROGRAMA DE CORTE PLASMA - LINUXCNC QTPLASMAC (MODO 0)       )`
+      : `( PROGRAMA DE CORTE PLASMA - LINUXCNC NGC                      )`,
+    isQtPlasmaC
+      ? `( Perfil: QtPlasmaC nativo sin eje Z (IHS, Altura y THC por pantalla) )`
+      : `( Generado para cortadora CNC de plasma con control de antorcha )`,
     `( ------------------------------------------------------------ )`,
     `( Dimensiones X: ${f3(bounds.minX)} a ${f3(bounds.maxX)} ${unitLabel} [Ancho: ${f3(bounds.width)} ${unitLabel}] )`,
     `( Dimensiones Y: ${f3(bounds.minY)} a ${f3(bounds.maxY)} ${unitLabel} [Alto: ${f3(bounds.height)} ${unitLabel}] )`,
+    hasG10 ? `( Rotacion de coordenadas LinuxCNC: ${g10Angle?.toFixed(2)} grados )` : `( Rotacion angular: 0.00 deg o calculada en trayectorias )`,
     `( Longitud total de corte: ${f3(totalCutLen)} ${unitLabel} )`,
     `( Cantidad de perforaciones (pierces): ${loops.length} )`,
     `( Tiempo estimado de mecanizado: ~${Math.floor(estSeconds / 60)}m ${estSeconds % 60}s )`,
@@ -244,40 +262,56 @@ function formatLinuxCncGcode(
     `G49 (Compensacion de longitud de herramienta cancelada)`,
     `G80 (Ciclo fijo cancelado)`,
     `G94 (Velocidad de avance por minuto)`,
-    ``,
-    `( Retraer eje Z a altura segura antes de iniciar )`,
-    `G0 Z${f3(config.safeZ)}`,
-    ``
   ];
+
+  if (hasG10 && g10Angle !== undefined) {
+    lines.push(``);
+    lines.push(`( Rotacion de sistema de coordenadas G54 en LinuxCNC )`);
+    lines.push(`G10 L2 P1 R${f3(g10Angle)} (Rota sistema de coordenadas G54 a ${g10Angle} deg)`);
+    lines.push(``);
+  } else {
+    lines.push(``);
+  }
+
+  if (!isQtPlasmaC) {
+    lines.push(`( Retraer eje Z a altura segura antes de iniciar )`);
+    lines.push(`G0 Z${f3(config.safeZ)}`);
+    lines.push(``);
+  }
 
   loops.forEach((loop, idx) => {
     lines.push(`( === Trayectoria ${idx + 1} de ${loops.length} === )`);
 
-    // Rapid to pierce point
+    // Rapid to pierce point (XY)
     lines.push(`G0 X${f3(loop.piercePoint.x)} Y${f3(loop.piercePoint.y)}`);
 
-    // Optional Touch-Off probe routine for LinuxCNC floating head
-    if (config.enableTouchOff) {
-      lines.push(`( Ciclo de contacto - Floating Head / Ohmic Probe )`);
-      lines.push(`G38.2 Z-50.000 F${f3(config.probeFeedRate)} (Busqueda de chapa)`);
-      lines.push(`G92 Z0.000 (Cero en contacto de interruptor)`);
-      lines.push(`G0 Z${f3(config.switchOffset)} (Compensar carrera del interruptor flotante)`);
-      lines.push(`G92 Z0.000 (Definir superficie real de la chapa Z0)`);
+    if (!isQtPlasmaC) {
+      // Optional Touch-Off probe routine for LinuxCNC floating head
+      if (config.enableTouchOff) {
+        lines.push(`( Ciclo de contacto - Floating Head / Ohmic Probe )`);
+        lines.push(`G38.2 Z-50.000 F${f3(config.probeFeedRate)} (Busqueda de chapa)`);
+        lines.push(`G92 Z0.000 (Cero en contacto de interruptor)`);
+        lines.push(`G0 Z${f3(config.switchOffset)} (Compensar carrera del interruptor flotante)`);
+        lines.push(`G92 Z0.000 (Definir superficie real de la chapa Z0)`);
+      }
+
+      // Move to pierce height
+      lines.push(`G0 Z${f3(config.pierceHeightZ)} (Altura de perforacion / Pierce Height)`);
+
+      // Torch on
+      lines.push(`${torchOnCmd} (Encender antorcha de plasma)`);
+
+      // Pierce delay
+      if (config.pierceDelay > 0) {
+        lines.push(`G4 P${config.pierceDelay.toFixed(2)} (Retardo de perforacion / Pierce Delay)`);
+      }
+
+      // Plunge to cutting height
+      lines.push(`G1 Z${f3(config.cutHeightZ)} F1200.0 (Bajar a altura de corte / Cut Height)`);
+    } else {
+      // QtPlasmaC Native Mode: M3 $0 S1 triggers internal IHS probe, pierce height, pierce delay, cut height, and THC!
+      lines.push(`${torchOnCmd} (Disparo antorcha: QtPlasmaC ejecuta IHS, Pierce y activa THC)`);
     }
-
-    // Move to pierce height
-    lines.push(`G0 Z${f3(config.pierceHeightZ)} (Altura de perforacion / Pierce Height)`);
-
-    // Torch on
-    lines.push(`${config.torchOnCommand} (Encender antorcha de plasma)`);
-
-    // Pierce delay
-    if (config.pierceDelay > 0) {
-      lines.push(`G4 P${config.pierceDelay.toFixed(2)} (Retardo de perforacion / Pierce Delay)`);
-    }
-
-    // Plunge to cutting height
-    lines.push(`G1 Z${f3(config.cutHeightZ)} F1200.0 (Bajar a altura de corte / Cut Height)`);
 
     // Cut lead-in if present
     if (loop.leadIn) {
@@ -298,19 +332,27 @@ function formatLinuxCncGcode(
     }
 
     // Torch off
-    lines.push(`${config.torchOffCommand} (Apagar antorcha de plasma)`);
-
-    // Retract to safe Z
-    lines.push(`G0 Z${f3(config.safeZ)} (Subir a altura segura)`);
+    if (isQtPlasmaC) {
+      lines.push(`${torchOffCmd} (Apagar antorcha: QtPlasmaC retrae Z a altura segura)`);
+    } else {
+      lines.push(`${torchOffCmd} (Apagar antorcha de plasma)`);
+      lines.push(`G0 Z${f3(config.safeZ)} (Subir a altura segura)`);
+    }
     lines.push(``);
   });
 
   // End of program
   lines.push(`( ------------------------------------------------------------ )`);
   lines.push(`( Fin del programa )`);
-  lines.push(`${config.torchOffCommand} (Garantizar antorcha apagada)`);
-  lines.push(`G0 Z${f3(config.safeZ)} (Retraccion segura)`);
+  lines.push(`${torchOffCmd} (Garantizar antorcha apagada)`);
+  if (!isQtPlasmaC) {
+    lines.push(`G0 Z${f3(config.safeZ)} (Retraccion segura)`);
+  }
   lines.push(`G0 X0.000 Y0.000 (Retorno a origen de la mesa)`);
+  if (hasG10) {
+    lines.push(`( Restablecer rotacion de coordenadas G54 a 0 grados )`);
+    lines.push(`G10 L2 P1 R0.000`);
+  }
   lines.push(`M2 (Fin de programa LinuxCNC)`);
   lines.push(`%`);
 

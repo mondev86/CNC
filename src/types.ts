@@ -2,8 +2,11 @@ export type MeasurementUnit = 'mm' | 'inch';
 
 export type FontStyleType = 'stencil' | 'single_line' | 'industrial_stencil';
 
+export type ControllerMode = 'qtplasmac' | 'standard';
+
 export interface PlasmaConfig {
   unit: MeasurementUnit;
+  controllerMode: ControllerMode; // 'qtplasmac' (Modo 0 sin Z, gestionado por QtPlasmaC) or 'standard' (Z explícito)
   cutFeedRate: number;        // e.g. 1800 mm/min
   rapidFeedRate: number;      // e.g. 6000 mm/min
   safeZ: number;              // e.g. 25 mm
@@ -73,3 +76,77 @@ export interface TextOptions {
   origin: 'bottom_left' | 'top_left' | 'center';
   bridgeWidth: number;       // stencil bridge width in mm
 }
+
+export interface WorkpieceConfig {
+  enabled: boolean;
+  width: number;             // mm (e.g. 600)
+  height: number;            // mm (e.g. 400)
+  margin: number;            // mm (e.g. 20)
+  positionMode: 'origin_with_margin' | 'center' | 'absolute_zero';
+  rotationAngle: number;     // degrees (-180 to 180 or 0 to 360)
+  rotationPivot: 'center' | 'origin';
+  useG10Rotation?: boolean;  // whether to include G10 L2 P1 R... in G-code header
+}
+
+export interface SheetPreset {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  description: string;
+  isPopular?: boolean;
+}
+
+export const STANDARD_SHEET_PRESETS: SheetPreset[] = [
+  {
+    id: '600x400',
+    name: '600 × 400 mm',
+    width: 600,
+    height: 400,
+    description: 'Estándar Simulación Debian QtPlasmaC / Mesa Banco',
+    isPopular: true
+  },
+  {
+    id: '500x300',
+    name: '500 × 300 mm',
+    width: 500,
+    height: 300,
+    description: 'Placa Cartelería / Letrero Taller',
+    isPopular: true
+  },
+  {
+    id: '800x500',
+    name: '800 × 500 mm',
+    width: 800,
+    height: 500,
+    description: 'Mesa CNC Compacta / Prototipado'
+  },
+  {
+    id: '1000x500',
+    name: '1000 × 500 mm',
+    width: 1000,
+    height: 500,
+    description: 'Media Plancha Estándar Taller'
+  },
+  {
+    id: '1000x1000',
+    name: '1000 × 1000 mm',
+    width: 1000,
+    height: 1000,
+    description: 'Mesa 1 m² LinuxCNC'
+  },
+  {
+    id: '1200x800',
+    name: '1200 × 800 mm',
+    width: 1200,
+    height: 800,
+    description: 'Formato Europallet'
+  },
+  {
+    id: '1250x2500',
+    name: '1250 × 2500 mm',
+    width: 1250,
+    height: 2500,
+    description: 'Chapa Industrial Estándar (4×8 pies)'
+  }
+];

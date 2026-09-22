@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { ToolpathData } from '../types';
-import { Download, Copy, Check, FileCode, Clock, Scissors, Target, Maximize } from 'lucide-react';
+import { ToolpathData, ControllerMode } from '../types';
+import { Download, Copy, Check, FileCode, Clock, Scissors, Target, Maximize, Cpu } from 'lucide-react';
 
 interface GCodeViewerProps {
   toolpath: ToolpathData;
   unit: 'mm' | 'inch';
   fileName?: string;
+  controllerMode?: ControllerMode;
 }
 
 export const GCodeViewer: React.FC<GCodeViewerProps> = ({
   toolpath,
   unit,
-  fileName = 'corte_plasma.ngc'
+  fileName = 'corte_plasma.ngc',
+  controllerMode = 'qtplasmac'
 }) => {
   const [copied, setCopied] = useState<boolean>(false);
 
@@ -96,10 +98,20 @@ export const GCodeViewer: React.FC<GCodeViewerProps> = ({
 
       {/* Code Header & Action Buttons */}
       <div id="gcode-actions-bar" className="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-white">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <FileCode className="w-4 h-4 text-stone-600" />
           <span className="font-medium text-sm text-stone-800 font-mono">{fileName}</span>
           <span className="text-xs text-stone-500">({gcodeLines.length} líneas)</span>
+          {controllerMode === 'qtplasmac' ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-800 border border-orange-200" title="Perfil QtPlasmaC Modo 0: Sin movimientos Z en el archivo G-code. QtPlasmaC gestiona alturas y THC.">
+              <Cpu className="w-3 h-3 text-orange-600" />
+              QtPlasmaC (Sin Z)
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-stone-100 text-stone-700 border border-stone-200" title="Perfil Estándar con alturas de Z incluidas en el G-code.">
+              Estándar (Con Z)
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
