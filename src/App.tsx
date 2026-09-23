@@ -225,58 +225,58 @@ export default function App() {
             </div>
           </div>
 
-          {/* Mode Switcher Tabs */}
-          <div id="mode-switcher" className="flex items-center bg-stone-800/90 p-1 rounded-xl border border-stone-700">
-            <button
-              id="tab-mode-text"
-              type="button"
-              onClick={() => setActiveTab('text')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === 'text'
-                  ? 'bg-orange-600 text-white shadow-xs'
-                  : 'text-stone-300 hover:text-white'
-              }`}
-            >
-              <Type className="w-4 h-4" />
-              <span>Texto a NGC</span>
-            </button>
+          {/* Actions and Mode Switcher */}
+          <div className="flex items-center gap-2.5 flex-wrap justify-center sm:justify-end">
+            {/* Mode Switcher Tabs */}
+            <div id="mode-switcher" className="flex items-center bg-stone-800/90 p-1 rounded-xl border border-stone-700">
+              <button
+                id="tab-mode-text"
+                type="button"
+                onClick={() => setActiveTab('text')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'text'
+                    ? 'bg-orange-600 text-white shadow-xs'
+                    : 'text-stone-300 hover:text-white'
+                }`}
+              >
+                <Type className="w-4 h-4" />
+                <span>Texto a NGC</span>
+              </button>
 
-            <button
-              id="tab-mode-svg"
-              type="button"
-              onClick={() => setActiveTab('svg')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === 'svg'
-                  ? 'bg-orange-600 text-white shadow-xs'
-                  : 'text-stone-300 hover:text-white'
-              }`}
-            >
-              <FileCode className="w-4 h-4" />
-              <span>SVG a NGC</span>
-            </button>
+              <button
+                id="tab-mode-svg"
+                type="button"
+                onClick={() => setActiveTab('svg')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'svg'
+                    ? 'bg-orange-600 text-white shadow-xs'
+                    : 'text-stone-300 hover:text-white'
+                }`}
+              >
+                <FileCode className="w-4 h-4" />
+                <span>SVG a NGC</span>
+              </button>
 
-            <div className="w-px h-5 bg-stone-700 mx-1" />
+              <div className="w-px h-5 bg-stone-700 mx-1" />
 
-            <button
-              id="toggle-settings-btn"
-              type="button"
-              onClick={() => setShowSettings(!showSettings)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                showSettings
-                  ? 'bg-stone-700 text-amber-300'
-                  : 'text-stone-300 hover:text-white'
-              }`}
-              title="Ajustes de máquina"
-            >
-              <Settings2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Parámetros Plasma</span>
-            </button>
-
-            <div className="w-px h-5 bg-stone-700 mx-1" />
-
-            <div>
-              <DesktopInstallModal />
+              <button
+                id="toggle-settings-btn"
+                type="button"
+                onClick={() => setShowSettings(!showSettings)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  showSettings
+                    ? 'bg-stone-700 text-amber-300'
+                    : 'text-stone-300 hover:text-white'
+                }`}
+                title="Ajustes de máquina"
+              >
+                <Settings2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Parámetros Plasma</span>
+              </button>
             </div>
+
+            {/* Direct Browser Installation */}
+            <DesktopInstallModal />
           </div>
         </div>
       </header>

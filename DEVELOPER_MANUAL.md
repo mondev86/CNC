@@ -21,6 +21,7 @@
 5. [Especificaciones para LinuxCNC y QtPlasmaC](#5-especificaciones-para-linuxcnc-y-qtplasmac)
 6. [Cómo Realizar Modificaciones Típicas](#6-cómo-realizar-modificaciones-típicas)
 7. [Comandos de Construcción y Verificación](#7-comandos-de-construcción-y-verificación)
+8. [Guía de Instalación en Taller: Navegador (PWA) vs Ejecutable Local](#8-guía-de-instalación-en-taller-navegador-pwa-vs-ejecutable-local)
 
 ---
 
@@ -354,6 +355,51 @@ Para compilar y verificar el estado del código:
 - **Servidor de desarrollo local**: `npm run dev` (abre en `http://localhost:3000`)
 - **Comprobación de tipos (TypeScript)**: `npm run lint` (ejecuta `tsc --noEmit`)
 - **Compilación de producción**: `npm run build` (genera el paquete listo para desplegar en `/dist`)
+
+---
+
+## 8. Guía de Instalación en Taller: Navegador (PWA) vs Ejecutable Local
+
+### A. Método Recomendado: Instalación Nativa 1-Clic desde el Navegador (PWA)
+
+PlasmaNGC Studio está configurado con **VitePWA**, un Web App Manifest completo y un Service Worker que permite instalar la aplicación directamente en el sistema operativo como un programa independiente.
+
+#### Pasos precisos en Google Chrome (Windows 11):
+1. Abrir la URL de la aplicación en una **pestaña independiente** (no dentro de un iframe o visor incrustado).
+2. Hacer clic en los tres puntos **`⋮`** de Chrome arriba a la derecha.
+3. Según la configuración de idioma de tu navegador:
+   - **En inglés:** Seleccionar **`Save page as app`** (o bien `Save and share` ➔ `Create shortcut...` marcando obligatoriamente la casilla **☑ "Open as window"**).
+   - **En español:** Seleccionar **`Guardar y compartir`** ➔ **`Instalar página como aplicación...`** (o `Crear acceso directo...` con casilla *Abrir como ventana*).
+4. Hacer clic en **Instalar / Crear**.
+
+#### Pasos precisos en Microsoft Edge (Windows 11):
+1. En la barra de direcciones superior de Edge, hacer clic en el icono de **"Aplicación disponible"** `[+]`.
+2. Confirmar pulsando **"Instalar"**.
+3. Marcar las casillas para crear el acceso directo en el Escritorio y anclarlo a la barra de tareas.
+
+#### Ventajas del Modo PWA en Taller:
+- **Cero alertas de SmartScreen:** Windows 11 lo trata como una aplicación segura y autorizada.
+- **Funcionamiento 100% Offline:** Todo el motor de cálculo vectorial, fuentes stencil y generación G-Code queda guardado en la caché local del disco duro.
+- **Ventana limpia:** Se abre sin barras de URL, pestañas ni distracciones visuales.
+
+---
+
+### B. Método Alternativo: Lanzadores Locales de Carpeta (.cmd / .bat / .sh)
+
+Si se descarga el código fuente o el archivo ZIP del proyecto:
+
+1. **En Windows 11:**
+   - Si Windows 11 bloquea los archivos descargados de la web con el filtro SmartScreen, hacer clic derecho sobre el `.zip` descargado ➔ *Propiedades* ➔ marcar abajo **☑ Desbloquear** ➔ *Aceptar*.
+   - Ejecutar **`INSTALAR_WINDOWS_11.cmd`**: este script remueve marcas web residuales con PowerShell (`Unblock-File`), crea el acceso directo en el Escritorio del usuario e inicia el servidor.
+   - Para uso diario, hacer doble clic en **`INICIAR_APP.cmd`**.
+   - *Requisito:* Tener instalado Node.js LTS en Windows.
+
+2. **En Linux (PC conectada al CNC con LinuxCNC):**
+   - Abrir terminal en la carpeta:
+     ```bash
+     chmod +x ejecutar_linux.sh
+     ./ejecutar_linux.sh
+     ```
 
 ---
 *Manual generado para desarrolladores e ingenieros de taller de PlasmaNGC Studio.*
