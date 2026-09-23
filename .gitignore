@@ -20,14 +20,6 @@ Thumbs.db
 *.sln
 *.sw?
 
-# Archivos de lógica propietaria y algoritmos CNC (Modo Demo GitHub)
-# Los siguientes archivos contienen la lógica central de cálculo geométrico y código G
-# para proteger el núcleo del proyecto al subir a un repositorio público tipo demo:
-src/utils/gcodeGenerator.ts
-src/utils/plasmaFonts.ts
-src/utils/svgParser.ts
-src/utils/workpieceCalculator.ts
-
 # Scripts de lanzamiento local del sistema
 *.cmd
 *.ps1
