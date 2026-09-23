@@ -1,15 +1,17 @@
 import React from 'react';
 import { PlasmaConfig, ControllerMode } from '../types';
-import { Settings, Sliders, Cpu, Info, CheckCircle2 } from 'lucide-react';
+import { Settings, Sliders, Cpu, Info, CheckCircle2, X } from 'lucide-react';
 
 interface PlasmaSettingsPanelProps {
   config: PlasmaConfig;
   onChange: (updated: PlasmaConfig) => void;
+  onClose?: () => void;
 }
 
 export const PlasmaSettingsPanel: React.FC<PlasmaSettingsPanelProps> = ({
   config,
-  onChange
+  onChange,
+  onClose
 }) => {
   const handleChange = <K extends keyof PlasmaConfig>(key: K, value: PlasmaConfig[K]) => {
     onChange({
@@ -78,7 +80,7 @@ export const PlasmaSettingsPanel: React.FC<PlasmaSettingsPanelProps> = ({
           <Settings className="w-4 h-4 text-orange-600" />
           <h2 className="text-sm font-semibold text-stone-900">Parámetros de Plasma LinuxCNC</h2>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <button
             id="btn-unit-mm"
             type="button"
@@ -103,6 +105,18 @@ export const PlasmaSettingsPanel: React.FC<PlasmaSettingsPanelProps> = ({
           >
             pulgadas (G20)
           </button>
+
+          {onClose && (
+            <button
+              id="btn-close-plasma-settings-modal"
+              type="button"
+              onClick={onClose}
+              className="ml-2 p-1 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-md transition-colors cursor-pointer"
+              title="Cerrar ventana de parámetros"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 

@@ -262,10 +262,19 @@ export default function App() {
               <button
                 id="toggle-settings-btn"
                 type="button"
-                onClick={() => setShowSettings(!showSettings)}
+                onClick={() => {
+                  const next = !showSettings;
+                  setShowSettings(next);
+                  if (next) {
+                    const el = document.getElementById('plasma-settings-panel');
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }
+                }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   showSettings
-                    ? 'bg-stone-700 text-amber-300'
+                    ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
                     : 'text-stone-300 hover:text-white'
                 }`}
                 title="Ajustes de máquina"
@@ -323,7 +332,7 @@ export default function App() {
               />
             )}
 
-            {/* Plasma Machine Parameters Panel */}
+            {/* Plasma Machine Parameters Panel (Inline Card) */}
             <PlasmaSettingsPanel
               config={plasmaConfig}
               onChange={setPlasmaConfig}
@@ -414,6 +423,27 @@ export default function App() {
 
       {/* Offline Status Alert */}
       <OfflineIndicator />
+
+      {/* Plasma Machine Parameters Modal Popup when triggered from Header or Visualizer */}
+      {showSettings && (
+        <div
+          id="plasma-settings-modal-backdrop"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/70 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={() => setShowSettings(false)}
+        >
+          <div
+            id="plasma-settings-modal-dialog"
+            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl bg-white border border-stone-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <PlasmaSettingsPanel
+              config={plasmaConfig}
+              onChange={setPlasmaConfig}
+              onClose={() => setShowSettings(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
