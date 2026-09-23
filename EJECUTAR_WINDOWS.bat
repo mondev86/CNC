@@ -1,40 +1,34 @@
 @echo off
+setlocal enabledelayedexpansion
+title PlasmaNGC Studio - Windows 11 Launcher
 cd /d "%~dp0"
-title PlasmaNGC Studio - LinuxCNC G-Code Generator
 color 0A
 
-echo ===================================================
-echo     PlasmaNGC Studio - Lanzador para Windows
-echo ===================================================
-echo.
+:: Desbloquear automáticamente la carpeta para que Windows 11 no muestre bloqueos
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path '%~dp0' -Recurse -ErrorAction SilentlyContinue | Unblock-File" >nul 2>&1
 
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [ERROR] No se encontro Node.js en este equipo.
-    echo Por favor descarga e instala Node.js (version LTS recomendada) desde:
-    echo https://nodejs.org/
+    echo ====================================================================
+    echo [ERROR] No se detecto Node.js en Windows 11.
+    echo ====================================================================
+    echo Para ejecutar la aplicacion se necesita Node.js (gratis y seguro).
+    echo Se abrira la pagina de descarga oficial...
+    start "" "https://nodejs.org/en/download"
     echo.
-    echo (Una vez instalado Node.js, vuelve a hacer doble clic en este archivo).
+    echo Pasos rapidos:
+    echo 1. Descarga el instalador 'Windows Installer (.msi) LTS' e instalalo.
+    echo 2. Vuelve a hacer doble clic en este archivo.
     echo.
     pause
     exit /b 1
 )
 
-echo [1/3] Verificando dependencias...
 if not exist "node_modules\" (
-    echo Instalando paquetes por primera vez, espera unos segundos...
-    call npm install
+    echo [1/2] Configurando dependencias por primera vez...
+    call npm install --prefer-offline --no-audit
 )
 
-echo.
-echo [2/3] Iniciando servidor local PlasmaNGC...
-echo La aplicacion se abrira en tu navegador predeterminado.
-echo.
-
+echo [2/2] Abriendo PlasmaNGC Studio en tu navegador...
 start "" "http://localhost:3000"
-
-echo [3/3] Servidor activo. Presiona Ctrl+C para detener.
-echo.
 call npm run dev
-pause
-
