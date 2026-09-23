@@ -263,8 +263,10 @@ Renderiza en un elemento `<canvas>` HTML5 de alta resolución (utilizando `windo
    - Trayectorias de corte `G1/G2/G3` en color verde brillante.
    - Movimientos rápidos en vacío `G0` en líneas punteadas celestes.
    - Puntos de perforación (*pierce points*) y líneas de *lead-in* en color naranja y amarillo.
-3. **Simulador de Antorcha**:
-   - Animación interactiva por `requestAnimationFrame` que simula el movimiento exacto del cabezal de plasma a velocidades seleccionables (`1x`, `2x`, `5x`, `10x`), mostrando el arco encendido en naranja.
+3. **Simulador de Antorcha y Barra HUD Colapsable**:
+   - Animación interactiva por `requestAnimationFrame` que simula el movimiento exacto del cabezal de plasma a velocidades seleccionables (`0.25x`, `0.5x`, `1x`, `2x`, `5x`), mostrando el arco encendido en naranja.
+   - **Barra de Simulación Colapsable / Expandible**: Cuenta con un botón de colapsar (`ChevronDown` / "Ocultar") que retrae toda la barra inferior para despejar el 100% del área visual del canvas y apreciar el dibujo sin obstáculos.
+   - **Mini-barra Flotante Compacta**: Cuando la barra está colapsada, se muestra un panel flotante discreto en la esquina inferior izquierda con un botón de Play rápido con porcentaje actual, botón de reset y botón de expandir (`ChevronUp` / "Controles Simulación") para restaurar la barra completa en cualquier instante.
 
 ---
 

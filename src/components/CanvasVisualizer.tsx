@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { ToolpathData, Point2D, WorkpieceConfig } from '../types';
-import { Play, Pause, RotateCcw, ZoomIn, ZoomOut, Maximize2, Flame, Search, Repeat, Gauge, Sliders, AlertTriangle, Sparkles } from 'lucide-react';
+import { Play, Pause, RotateCcw, ZoomIn, ZoomOut, Maximize2, Flame, Search, Repeat, Gauge, Sliders, AlertTriangle, Sparkles, ChevronDown, ChevronUp, Eye, EyeOff, X } from 'lucide-react';
 
 interface CanvasVisualizerProps {
   toolpath: ToolpathData;
@@ -44,6 +44,8 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
   const [progress, setProgress] = useState<number>(0); // 0 to 1
   const [simSpeed, setSimSpeed] = useState<number>(2); // 1x, 2x, 5x
   const [isLooping, setIsLooping] = useState<boolean>(false); // Continuous auto-repeat loop
+  const [isSimulationExpanded, setIsSimulationExpanded] = useState<boolean>(true); // Collapsible simulation HUD bar
+  const [showCenterPlayButton, setShowCenterPlayButton] = useState<boolean>(true); // Toggle the large center Play button overlay to clearly see drawing
 
   // Ref to always have latest progress inside animation loop without stale closure or setter side effects
   const progressRef = useRef<number>(0);
@@ -674,13 +676,24 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
         onWheel={handleWheel}
       />
 
-      {/* Big Center Play Prompt when simulation is at 0% and stopped */}
-      {!isPlaying && progress === 0 && (
+      {/* Big Center Play Prompt when simulation is at 0% and stopped (Collapsible to clearly see drawing) */}
+      {!isPlaying && progress === 0 && showCenterPlayButton && (
         <div
           id="canvas-center-play-overlay"
-          className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center"
+          className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center animate-in fade-in duration-200"
         >
-          <div className="flex flex-col items-center gap-3 bg-slate-950/80 p-4 rounded-2xl border border-slate-700/60 backdrop-blur-md shadow-2xl">
+          <div className="relative flex flex-col items-center gap-3 bg-slate-950/85 p-5 rounded-2xl border border-slate-700/80 backdrop-blur-md shadow-2xl">
+            {/* Close/Hide Center Button */}
+            <button
+              id="btn-close-center-play"
+              type="button"
+              onClick={() => setShowCenterPlayButton(false)}
+              className="absolute top-2 right-2 p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg pointer-events-auto transition-colors cursor-pointer"
+              title="Ocultar este botón central para ver el dibujo despejado"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
             <button
               id="btn-overlay-play"
               type="button"
@@ -720,6 +733,14 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
                 ))}
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setShowCenterPlayButton(false)}
+              className="pointer-events-auto text-[11px] text-slate-400 hover:text-amber-400 underline cursor-pointer"
+            >
+              Ocultar este botón para apreciar solo el dibujo
+            </button>
           </div>
         </div>
       )}
@@ -889,6 +910,23 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
 
         <div className="w-full h-px bg-slate-800 my-0.5" />
 
+        {/* Toggle big center Play button */}
+        <button
+          id="btn-toggle-center-play-overlay"
+          type="button"
+          onClick={() => setShowCenterPlayButton(p => !p)}
+          className={`p-1.5 rounded transition-colors cursor-pointer ${
+            showCenterPlayButton
+              ? 'text-amber-400 bg-amber-500/15 hover:bg-amber-500/25'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+          title={showCenterPlayButton ? 'Ocultar botón central de Play (despejar dibujo)' : 'Mostrar botón central de Play'}
+        >
+          {showCenterPlayButton ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+        </button>
+
+        <div className="w-full h-px bg-slate-800 my-0.5" />
+
         {/* Quick Zoom Presets 1x, 2x, 5x, 10x */}
         {[1, 2, 5, 10].map(z => (
           <button
@@ -908,15 +946,189 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
         ))}
       </div>
 
-      {/* Bottom HUD: CNC Simulation Playback Toolbar */}
-      <div
-        id="simulation-toolbar"
-        className="relative z-10 p-2.5 bg-slate-950/85 backdrop-blur-md border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs"
-      >
-        {/* Left: Simulation playback & speed */}
-        <div className="flex items-center gap-2">
+      {/* Collapsible Simulation Toolbar / HUD */}
+      {isSimulationExpanded ? (
+        <div
+          id="simulation-toolbar"
+          className="relative z-10 p-2.5 bg-slate-950/85 backdrop-blur-md border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs transition-all animate-in fade-in slide-in-from-bottom-2 duration-150"
+        >
+          {/* Left: Simulation playback & speed */}
+          <div className="flex items-center gap-2">
+            <button
+              id="btn-play-pause-simulation"
+              type="button"
+              onClick={() => {
+                if (progress >= 1) {
+                  progressRef.current = 0;
+                  setProgress(0);
+                }
+                setIsPlaying(prev => !prev);
+              }}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-semibold text-xs transition-all shadow-sm cursor-pointer ${
+                isPlaying
+                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 ring-2 ring-amber-400/50'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white ring-1 ring-emerald-400/30'
+              }`}
+              title={isPlaying ? 'Pausar simulación automática' : 'Reproducir simulación en automático (Play)'}
+            >
+              {isPlaying ? (
+                <>
+                  <Pause className="w-3.5 h-3.5 fill-current" />
+                  <span>Pausar</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>{progress >= 1 ? 'Repetir Play' : 'Play Simulación'}</span>
+                </>
+              )}
+            </button>
+
+            {/* Quick Collapse Arrow right next to Play */}
+            <button
+              id="btn-quick-collapse-next-to-play"
+              type="button"
+              onClick={() => setIsSimulationExpanded(false)}
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-slate-700/50 cursor-pointer"
+              title="Plegar / Ocultar barra de simulación"
+            >
+              <ChevronDown className="w-3.5 h-3.5 text-amber-400" />
+            </button>
+
+            <button
+              id="btn-reset-simulation"
+              type="button"
+              onClick={() => {
+                setIsPlaying(false);
+                progressRef.current = 0;
+                setProgress(0);
+              }}
+              className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 active:scale-95 rounded-lg transition-colors border border-slate-700/50 cursor-pointer"
+              title="Rebobinar al inicio (0%)"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Continuous Loop Toggle */}
+            <button
+              id="btn-loop-simulation"
+              type="button"
+              onClick={() => setIsLooping(l => !l)}
+              className={`p-1.5 rounded-lg transition-colors border cursor-pointer ${
+                isLooping
+                  ? 'bg-orange-500/20 text-orange-400 border-orange-500/60 font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800 border-slate-700/50'
+              }`}
+              title={isLooping ? 'Bucle automático activado (Repetir siempre)' : 'Activar bucle automático (Repetir)'}
+            >
+              <Repeat className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Simulation Speed Selector */}
+            <div className="flex items-center gap-1.5 border-l border-slate-800 pl-2">
+              <div className="flex items-center gap-1 text-slate-400 text-[11px]" title="Velocidad de reproducción de la simulación">
+                <Gauge className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline font-medium">Velocidad:</span>
+              </div>
+              <div className="flex items-center border border-slate-700/60 rounded-lg overflow-hidden bg-slate-950 shadow-inner">
+                {[
+                  { val: 0.25, label: '0.25x', title: 'Muy lenta (0.25x) - Cámara lenta para ver perforación y entradas' },
+                  { val: 0.5, label: '0.5x', title: 'Lenta (0.5x) - Media velocidad' },
+                  { val: 1, label: '1x', title: 'Normal (1x) - Velocidad base' },
+                  { val: 2, label: '2x', title: 'Rápida (2x) - Doble velocidad' },
+                  { val: 5, label: '5x', title: 'Muy rápida (5x) - Avance acelerado' },
+                ].map(opt => (
+                  <button
+                    key={opt.val}
+                    id={`speed-btn-${opt.val}x`}
+                    type="button"
+                    onClick={() => setSimSpeed(opt.val)}
+                    className={`px-2 py-1 text-xs transition-colors cursor-pointer font-medium ${
+                      simSpeed === opt.val
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                    title={opt.title}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Center: Timeline Scrubber */}
+          <div className="flex items-center gap-2.5 flex-1 min-w-[160px] max-w-xs">
+            <Flame className={`w-4 h-4 shrink-0 ${isPlaying ? 'text-orange-500 animate-pulse' : 'text-slate-500'}`} />
+            <input
+              id="simulation-timeline-slider"
+              type="range"
+              min={0}
+              max={1}
+              step={0.002}
+              value={progress}
+              onChange={e => {
+                const val = parseFloat(e.target.value);
+                progressRef.current = val;
+                setProgress(val);
+                if (isPlaying) setIsPlaying(false);
+              }}
+              className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-orange-500"
+            />
+            <span className="font-mono text-slate-400 text-xs w-9 text-right shrink-0">
+              {Math.round(progress * 100)}%
+            </span>
+          </div>
+
+          {/* Right: Interactive Zoom Presets and Collapse Button */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/60 rounded-lg p-1 shadow-sm">
+              <div className="flex items-center gap-1 text-slate-300 pl-1 pr-0.5">
+                <Search className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-slate-300 font-semibold text-xs">Zoom:</span>
+              </div>
+              <div className="flex items-center border border-slate-700/50 rounded-md overflow-hidden bg-slate-950">
+                {[1, 2, 5, 10].map(z => (
+                  <button
+                    key={z}
+                    id={`zoom-btn-${z}x`}
+                    type="button"
+                    onClick={() => handleZoomPreset(z)}
+                    className={`px-2.5 py-1 text-xs font-mono font-medium transition-all cursor-pointer ${
+                      activeZoom === z
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    }`}
+                    title={`Zoom a ${z}x (${z * 100}%)`}
+                  >
+                    {z}x
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Collapse / Hide Button */}
+            <button
+              id="btn-collapse-simulation-bar"
+              type="button"
+              onClick={() => setIsSimulationExpanded(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white rounded-lg border border-slate-700 hover:border-amber-400/50 transition-all cursor-pointer text-xs font-semibold shadow-xs"
+              title="Ocultar barra de controles para despejar el 100% del dibujo en pantalla"
+            >
+              <ChevronDown className="w-4 h-4 text-amber-400" />
+              <span>Ocultar Barra</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Floating mini-bar when collapsed: maximal canvas view with instant expand or quick play */
+        <div
+          id="simulation-minibar"
+          className="absolute bottom-3 left-4 z-20 flex items-center gap-2 bg-slate-950/90 backdrop-blur-md border border-slate-700/80 rounded-xl p-1.5 shadow-xl text-xs transition-all animate-in fade-in zoom-in-95 duration-150"
+        >
+          {/* Quick Play/Pause without expanding */}
           <button
-            id="btn-play-pause-simulation"
+            id="btn-quick-play-collapsed"
             type="button"
             onClick={() => {
               if (progress >= 1) {
@@ -925,12 +1137,12 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
               }
               setIsPlaying(prev => !prev);
             }}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-semibold text-xs transition-all shadow-sm cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all shadow-sm cursor-pointer ${
               isPlaying
-                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 ring-2 ring-amber-400/50'
-                : 'bg-emerald-600 hover:bg-emerald-500 text-white ring-1 ring-emerald-400/30'
+                ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400/50'
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
             }`}
-            title={isPlaying ? 'Pausar simulación automática' : 'Reproducir simulación en automático (Play)'}
+            title={isPlaying ? 'Pausar simulación' : 'Play simulación rápida'}
           >
             {isPlaying ? (
               <>
@@ -940,122 +1152,41 @@ export const CanvasVisualizer: React.FC<CanvasVisualizerProps> = ({
             ) : (
               <>
                 <Play className="w-3.5 h-3.5 fill-current" />
-                <span>{progress >= 1 ? 'Repetir Play' : 'Play Simulación'}</span>
+                <span>Play ({Math.round(progress * 100)}%)</span>
               </>
             )}
           </button>
 
+          {/* Quick Reset */}
           <button
-            id="btn-reset-simulation"
+            id="btn-quick-reset-collapsed"
             type="button"
             onClick={() => {
               setIsPlaying(false);
               progressRef.current = 0;
               setProgress(0);
             }}
-            className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 active:scale-95 rounded-lg transition-colors border border-slate-700/50 cursor-pointer"
-            title="Rebobinar al inicio (0%)"
+            className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            title="Rebobinar a 0%"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
 
-          {/* Continuous Loop Toggle */}
+          <div className="w-px h-4 bg-slate-700 mx-0.5" />
+
+          {/* Expand Toolbar Button */}
           <button
-            id="btn-loop-simulation"
+            id="btn-expand-simulation-bar"
             type="button"
-            onClick={() => setIsLooping(l => !l)}
-            className={`p-1.5 rounded-lg transition-colors border cursor-pointer ${
-              isLooping
-                ? 'bg-orange-500/20 text-orange-400 border-orange-500/60 font-bold'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800 border-slate-700/50'
-            }`}
-            title={isLooping ? 'Bucle automático activado (Repetir siempre)' : 'Activar bucle automático (Repetir)'}
+            onClick={() => setIsSimulationExpanded(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg transition-all cursor-pointer font-medium text-xs border border-slate-600/50"
+            title="Mostrar controles completos de simulación, velocidad y línea de tiempo"
           >
-            <Repeat className="w-3.5 h-3.5" />
+            <ChevronUp className="w-4 h-4 text-amber-400" />
+            <span>Controles Simulación</span>
           </button>
-
-          {/* Simulation Speed Selector */}
-          <div className="flex items-center gap-1.5 border-l border-slate-800 pl-2">
-            <div className="flex items-center gap-1 text-slate-400 text-[11px]" title="Velocidad de reproducción de la simulación">
-              <Gauge className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline font-medium">Velocidad:</span>
-            </div>
-            <div className="flex items-center border border-slate-700/60 rounded-lg overflow-hidden bg-slate-950 shadow-inner">
-              {[
-                { val: 0.25, label: '0.25x', title: 'Muy lenta (0.25x) - Cámara lenta para ver perforación y entradas' },
-                { val: 0.5, label: '0.5x', title: 'Lenta (0.5x) - Media velocidad' },
-                { val: 1, label: '1x', title: 'Normal (1x) - Velocidad base' },
-                { val: 2, label: '2x', title: 'Rápida (2x) - Doble velocidad' },
-                { val: 5, label: '5x', title: 'Muy rápida (5x) - Avance acelerado' },
-              ].map(opt => (
-                <button
-                  key={opt.val}
-                  id={`speed-btn-${opt.val}x`}
-                  type="button"
-                  onClick={() => setSimSpeed(opt.val)}
-                  className={`px-2 py-1 text-xs transition-colors cursor-pointer font-medium ${
-                    simSpeed === opt.val
-                      ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                  }`}
-                  title={opt.title}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
-
-        {/* Center: Timeline Scrubber */}
-        <div className="flex items-center gap-2.5 flex-1 min-w-[160px] max-w-xs">
-          <Flame className={`w-4 h-4 shrink-0 ${isPlaying ? 'text-orange-500 animate-pulse' : 'text-slate-500'}`} />
-          <input
-            id="simulation-timeline-slider"
-            type="range"
-            min={0}
-            max={1}
-            step={0.002}
-            value={progress}
-            onChange={e => {
-              const val = parseFloat(e.target.value);
-              progressRef.current = val;
-              setProgress(val);
-              if (isPlaying) setIsPlaying(false);
-            }}
-            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-orange-500"
-          />
-          <span className="font-mono text-slate-400 text-xs w-9 text-right shrink-0">
-            {Math.round(progress * 100)}%
-          </span>
-        </div>
-
-        {/* Right: Interactive Zoom Presets (1x, 2x, 5x, 10x) */}
-        <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/60 rounded-lg p-1 shadow-sm">
-          <div className="flex items-center gap-1 text-slate-300 pl-1 pr-0.5">
-            <Search className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-slate-300 font-semibold text-xs">Zoom:</span>
-          </div>
-          <div className="flex items-center border border-slate-700/50 rounded-md overflow-hidden bg-slate-950">
-            {[1, 2, 5, 10].map(z => (
-              <button
-                key={z}
-                id={`zoom-btn-${z}x`}
-                type="button"
-                onClick={() => handleZoomPreset(z)}
-                className={`px-2.5 py-1 text-xs font-mono font-medium transition-all cursor-pointer ${
-                  activeZoom === z
-                    ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-                title={`Zoom a ${z}x (${z * 100}%)`}
-              >
-                {z}x
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

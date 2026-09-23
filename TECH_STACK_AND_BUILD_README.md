@@ -42,13 +42,14 @@ Este documento detalla todas las tecnologías, librerías, algoritmos y decision
 - **Secuencia de Palpado IHS y Control de Altura THC**:
   - Código compatible con sensado óhmico/flotante antes de cada perforación y activación de lecturas de tensión de arco para altura constante durante el avance.
 
-### D. Simulador Gráfico y Disposición en Chapa (`src/components/WorkpieceVisualizer.tsx`)
+### D. Simulador Gráfico y Disposición en Chapa (`src/components/CanvasVisualizer.tsx`)
 - Renderizado interactivo sobre `<canvas>` con soporte para:
   - Definición de dimensiones reales de la chapa (ancho x alto en mm).
   - Márgenes de seguridad perimetrales.
   - Multiplicación matricial (anidado simple en filas y columnas con espacio entre piezas).
   - Rotación libre (0°, 90°, 180°, 270° o ángulo personalizado).
-  - Visualización diferenciada: líneas de corte activas (rojo/naranja), desplazamientos en rápido G0 (líneas discontinuas cian) y puntos de perforación (cruces amarillas).
+  - Visualización diferenciada: líneas de corte activas (verde/cian), desplazamientos en rápido G0 (líneas discontinuas celestes) y puntos de perforación (cruces y antorcha naranja).
+  - **Barra de Simulación Colapsable**: Posibilidad de replegar el panel de reproducción inferior con un clic para visualizar el 100% del área de trabajo sin superposiciones, manteniendo una mini-barra flotante para reproducir y expandir en cualquier momento.
 
 ---
 

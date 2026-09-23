@@ -54,6 +54,7 @@ Si prefieres ejecutar el código fuente directamente en tu máquina local:
 - **Fuentes Stencil para Plasma**: Letras con puentes físicos de soporte para evitar que se caigan las islas interiores (A, B, D, O, P, Q, R).
 - **Conversor de Vectores SVG**: Inversión automática del eje Y (el estándar SVG tiene el origen arriba a la izquierda; el código CNC sitúa el origen abajo a la izquierda).
 - **Alineación y Simulación en Chapa**: Colocación en la chapa con márgenes de seguridad, rotación en cualquier ángulo y replicación matricial (anidado simple en filas y columnas).
+- **Simulador Gráfico con Barra Colapsable**: Visualización interactiva en tiempo real del recorrido del cabezal de plasma y barra de controles de simulación (Play, pausa, velocidad, zoom, scrubber) colapsable con un clic para apreciar el dibujo en el 100% del área del canvas sin obstrucciones.
 - **Salida Específica para LinuxCNC / QtPlasmaC**:
   - Encendido/apagado de antorcha con husillo 0 (`M3 $0 S1` y `M5 $0`).
   - Compatibilidad nativa con control de altura THC y palpador de chapa óhmico/flotante IHS.
